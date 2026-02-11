@@ -1,16 +1,12 @@
 [project]
 name = "funrec"
-version = "0.0.5"
+version = "0.0.6"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = [ "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0",]
+dependencies = [ "funlog-tau>=1.0.1", "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0",]
 [[project.authors]]
-name = "牛哥"
-email = "niuliangtao@qq.com"
-
-[[project.authors]]
-name = "farfarfun"
+name = "niuliangtao"
 email = "farfarfun@qq.com"
 
 [[project.maintainers]]
@@ -20,6 +16,9 @@ email = "niuliangtao@qq.com"
 [[project.maintainers]]
 name = "farfarfun"
 email = "farfarfun@qq.com"
+
+[format]
+line-length = 100
 
 [project.urls]
 Organization = "https://github.com/farfarfun"
@@ -28,6 +27,3 @@ Releases = "https://github.com/farfarfun/funrec/releases"
 
 [tool.setuptools]
 license-files = []
-
-[format]
-line-length = 100  # 调整为 100 字符

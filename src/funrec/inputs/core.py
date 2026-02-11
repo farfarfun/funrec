@@ -7,7 +7,7 @@ from itertools import chain
 import numpy as np
 import torch
 import torch.nn as nn
-from funutil import getLogger
+from funlog import getLogger
 
 from funrec.layers.sequence import SequencePoolingLayer
 from funrec.layers.utils import concat_fun

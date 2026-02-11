@@ -81,8 +81,9 @@ class IFM(BaseModel):
         self.sparse_feat_num = len(
             list(
                 filter(
-                    lambda x: isinstance(x, SparseFeat)
-                    or isinstance(x, VarLenSparseFeat),
+                    lambda x: (
+                        isinstance(x, SparseFeat) or isinstance(x, VarLenSparseFeat)
+                    ),
                     dnn_feature_columns,
                 )
             )
