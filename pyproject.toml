@@ -1,14 +1,19 @@
 [project]
 name = "funrec"
-version = "0.0.6"
+version = "0.0.7"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [ "nltlog>=1.1.6", "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0",]
+license = "MIT"
+license-files = ["LICENSE"]
 [[project.authors]]
-name = "niuliangtao"
-email = "farfarfun@qq.com"
+name = "牛哥"
+email = "niuliangtao@qq.com"
 
+[[project.authors]]
+name = "farfarfun"
+email = "farfarfun@qq.com"
 [[project.maintainers]]
 name = "牛哥"
 email = "niuliangtao@qq.com"
@@ -16,7 +21,6 @@ email = "niuliangtao@qq.com"
 [[project.maintainers]]
 name = "farfarfun"
 email = "farfarfun@qq.com"
-
 [format]
 line-length = 100
 
@@ -26,4 +30,3 @@ Repository = "https://github.com/farfarfun/funrec"
 Releases = "https://github.com/farfarfun/funrec/releases"
 
 [tool.setuptools]
-license-files = []
