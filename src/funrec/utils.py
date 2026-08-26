@@ -5,7 +5,7 @@ import json
 from threading import Thread
 
 import requests
-from funlog import getLogger
+from nltlog import getLogger
 from packaging.version import parse
 from pip._vendor.packaging.version import parse
 

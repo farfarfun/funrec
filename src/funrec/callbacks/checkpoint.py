@@ -1,5 +1,5 @@
 import torch
-from funlog import getLogger
+from nltlog import getLogger
 from tensorflow.python.keras.callbacks import CallbackList, EarlyStopping, History
 from tensorflow.python.keras.callbacks import ModelCheckpoint as _ModelCheckpoint
 
