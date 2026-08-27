@@ -4,7 +4,7 @@ version = "0.0.7"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [ "nltlog>=1.1.6", "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0",]
+dependencies = [ "nltlog>=1.1.6", "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0", "requests>=2.25.0",]
 license = "MIT"
 license-files = ["LICENSE"]
 [[project.authors]]
@@ -30,3 +30,6 @@ Repository = "https://github.com/farfarfun/funrec"
 Releases = "https://github.com/farfarfun/funrec/releases"
 
 [tool.setuptools]
+
+[dependency-groups]
+dev = ["pytest>=8.0.0"]
