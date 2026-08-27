@@ -1,10 +1,10 @@
 [project]
 name = "funrec"
-version = "0.0.7"
+version = "0.0.8"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [ "nltlog>=1.1.6", "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0", "requests>=2.25.0",]
+dependencies = [ "farlog>=1.1.7", "funutil>=1.0.53", "scikit-learn>=1.6.0", "torch>=2.5.0", "tqdm>=4.67.0", "requests>=2.25.0",]
 license = "MIT"
 license-files = ["LICENSE"]
 [[project.authors]]
