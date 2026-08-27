@@ -1,6 +1,6 @@
 [project]
 name = "funrec"
-version = "0.0.8"
+version = "0.0.9"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,10 @@ Repository = "https://github.com/farfarfun/funrec"
 Releases = "https://github.com/farfarfun/funrec/releases"
 
 [tool.setuptools]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = ["pytest>=8.0.0"]
