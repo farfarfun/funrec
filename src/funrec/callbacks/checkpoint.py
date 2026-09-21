@@ -1,7 +1,48 @@
 import torch
 from farlog import getLogger
-from tensorflow.python.keras.callbacks import CallbackList, EarlyStopping, History
-from tensorflow.python.keras.callbacks import ModelCheckpoint as _ModelCheckpoint
+
+try:
+    from tensorflow.python.keras.callbacks import CallbackList, EarlyStopping, History
+    from tensorflow.python.keras.callbacks import ModelCheckpoint as _ModelCheckpoint
+except ImportError:
+    class _Callback:
+        """PyTorch 项目使用的轻量回调基类。"""
+
+        def __init__(self, *args, **kwargs):
+            self.model = None
+
+        def set_model(self, model):
+            self.model = model
+
+    class CallbackList(list):
+        """兼容 Keras 名称的回调列表。"""
+
+    class EarlyStopping(_Callback):
+        """兼容 Keras 名称的提前停止回调占位实现。"""
+
+    class History(_Callback):
+        """记录训练历史的轻量回调。"""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.history = {}
+
+    class _ModelCheckpoint(_Callback):
+        """提供 ModelCheckpoint 所需的最小配置接口。"""
+
+        def __init__(self, filepath, monitor="val_loss", verbose=0,
+                     save_best_only=False, mode="auto", save_weights_only=False,
+                     period=1, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.filepath = filepath
+            self.monitor = monitor
+            self.verbose = verbose
+            self.save_best_only = save_best_only
+            self.save_weights_only = save_weights_only
+            self.period = period
+            self.epochs_since_last_save = 0
+            self.best = float("inf") if mode == "min" else float("-inf")
+            self.monitor_op = (lambda current, best: current < best) if mode == "min" else (lambda current, best: current > best)
 
 from funrec.layers import DNN
 

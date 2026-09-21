@@ -3,6 +3,7 @@
 
 from collections import OrderedDict, defaultdict
 from itertools import chain
+from typing import Any
 
 import numpy as np
 import torch
@@ -93,7 +94,9 @@ class VarLenSparseFeat:
 
 
 class DenseFeat:
-    def __init__(self, name, dimension=1, dtype="float32"):
+    """描述一个连续数值特征。"""
+
+    def __init__(self, name: str, dimension: int = 1, dtype: str = "float32") -> None:
         self.name = name
         self.dimension = dimension
         self.dtype = dtype
@@ -102,7 +105,8 @@ class DenseFeat:
         return self.name.__hash__()
 
 
-def get_feature_names(feature_columns):
+def get_feature_names(feature_columns: list[Any]) -> list[str]:
+    """返回特征列对应的输入名称。"""
     features = build_input_features(feature_columns)
     return list(features.keys())
 
@@ -111,8 +115,8 @@ def get_feature_names(feature_columns):
 #     return list(chain(*list(map(lambda x: x.values(), filter(lambda x: x is not None, inputs)))))
 
 
-def build_input_features(feature_columns):
-    # Return OrderedDict: {feature_name:(start, start+dimension)}
+def build_input_features(feature_columns: list[Any]) -> OrderedDict[str, tuple[int, int]]:
+    """构建特征名称到输入张量切片范围的映射。"""
 
     features = OrderedDict()
 

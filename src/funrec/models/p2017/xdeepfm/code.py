@@ -12,8 +12,8 @@ from funrec.layers import CIN, DNN
 from funrec.models.b2000 import BaseModel
 
 
-class xDeepFM(BaseModel):
-    """Instantiates the xDeepFM architecture.
+class XDeepFM(BaseModel):
+    """构建 xDeepFM 推荐模型。
 
     :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
     :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
@@ -121,7 +121,7 @@ class xDeepFM(BaseModel):
 
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )
@@ -141,3 +141,7 @@ class xDeepFM(BaseModel):
             final_logit += dnn_logit  # + Deep
 
         return self.out(final_logit)
+
+
+# 兼容历史导入路径，同时让公开类名符合 PascalCase 规范。
+xDeepFM = XDeepFM

@@ -5,6 +5,6 @@ from .deepfm import DeepFM
 from .mlr import MLR
 from .nfm import NFM
 from .sharedbottom import SharedBottom
-from .xdeepfm import xDeepFM
+from .xdeepfm import XDeepFM, xDeepFM
 
-__all__ = ["AFM", "DCN", "DCNMix", "DeepFM", "MLR", "NFM", "SharedBottom", "xDeepFM"]
+__all__ = ["AFM", "DCN", "DCNMix", "DeepFM", "MLR", "NFM", "SharedBottom", "XDeepFM", "xDeepFM"]

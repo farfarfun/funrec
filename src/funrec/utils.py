@@ -7,7 +7,6 @@ from threading import Thread
 import requests
 from farlog import getLogger
 from packaging.version import parse
-from pip._vendor.packaging.version import parse
 
 logger = getLogger("funrec")
 

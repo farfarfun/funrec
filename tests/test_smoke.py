@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
-"""Lightweight smoke tests for the funrec package.
+"""funrec 公共 API 的轻量测试。
 
 funrec has no ``[project.scripts]`` CLI entry point, so this suite focuses on:
   * importability of the top-level package and its public submodules
@@ -8,56 +8,13 @@ funrec has no ``[project.scripts]`` CLI entry point, so this suite focuses on:
   * making sure the (rarely used) network-touching helper ``check_version``
     never performs a real HTTP call during tests
 
-Known upstream bug worked around here (NOT fixed, see module-level stub below):
-``funrec/callbacks/checkpoint.py`` does::
-
-    from tensorflow.python.keras.callbacks import CallbackList, EarlyStopping, History
-
-even though this is a pure PyTorch project (``pyproject.toml`` only declares
-``torch``, never ``tensorflow``) and ``tensorflow.python.keras`` is a legacy
-internal path that was deprecated in Keras 2.6 and no longer exists in modern
-TensorFlow/Keras 3 releases. As a result, a plain ``pip install funrec`` in a
-clean environment followed by ``import funrec`` currently ALWAYS raises
-``ModuleNotFoundError: No module named 'tensorflow'`` -- the whole
-``funrec.models`` tree (and therefore the top-level ``funrec`` package) is
-unimportable out of the box. We stub a minimal fake
-``tensorflow.python.keras.callbacks`` module in ``sys.modules`` below purely
-so the rest of this smoke suite can exercise the real, working PyTorch code
-underneath. This is a workaround for the test environment only -- the actual
-source bug is left untouched per the task's "don't fix business logic bugs"
-scope and is called out here and in the task report instead.
+回调模块使用 PyTorch 兼容实现，因此测试可以在没有 TensorFlow 的干净环境中导入。
 """
 
 import json
-import sys
-import types
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-# --- work around the tensorflow.python.keras.callbacks import bug (see module
-# docstring) so the rest of funrec (which is pure PyTorch) can be smoke tested ---
-if "tensorflow" not in sys.modules:
-    _fake_callbacks_mod = types.ModuleType("tensorflow.python.keras.callbacks")
-
-    class _FakeKerasCallback:
-        def __init__(self, *args, **kwargs):
-            pass
-
-    _fake_callbacks_mod.CallbackList = _FakeKerasCallback
-    _fake_callbacks_mod.EarlyStopping = _FakeKerasCallback
-    _fake_callbacks_mod.History = _FakeKerasCallback
-    _fake_callbacks_mod.ModelCheckpoint = _FakeKerasCallback
-
-    _fake_tf = types.ModuleType("tensorflow")
-    _fake_tf_python = types.ModuleType("tensorflow.python")
-    _fake_tf_python_keras = types.ModuleType("tensorflow.python.keras")
-
-    sys.modules["tensorflow"] = _fake_tf
-    sys.modules["tensorflow.python"] = _fake_tf_python
-    sys.modules["tensorflow.python.keras"] = _fake_tf_python_keras
-    sys.modules["tensorflow.python.keras.callbacks"] = _fake_callbacks_mod
-
 
 import torch  # noqa: E402
 
@@ -188,9 +145,7 @@ def test_check_version_never_makes_a_real_network_call():
 
 
 def test_callbacks_module_importable_and_defines_expected_names():
-    """funrec.callbacks only works today because of the tensorflow stub above
-    (see module docstring) -- this test documents that its public names are at
-    least importable, not that its TF-derived behaviour is correct."""
+    """funrec.callbacks 在没有 TensorFlow 的环境中也应提供公开名称。"""
     assert hasattr(funrec.callbacks, "ModelCheckpoint")
     assert hasattr(funrec.callbacks, "History")
     assert hasattr(funrec.callbacks, "CallbackList")
