@@ -1,4 +1,3 @@
-# -*- coding:utf-8 -*-
 """funrec 公共 API 的轻量测试。
 
 funrec has no ``[project.scripts]`` CLI entry point, so this suite focuses on:
@@ -15,23 +14,22 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 
-import torch  # noqa: E402
-
-import funrec  # noqa: E402
-import funrec.callbacks  # noqa: E402
-import funrec.inputs  # noqa: E402
-import funrec.layers  # noqa: E402
-import funrec.models  # noqa: E402
-from funrec.inputs import (  # noqa: E402
+import funrec
+import funrec.callbacks
+import funrec.inputs
+import funrec.layers
+import funrec.models
+from funrec.inputs import (
     DenseFeat,
     SparseFeat,
     VarLenSparseFeat,
     build_input_features,
     get_feature_names,
 )
-from funrec.layers import DNN, PredictionLayer  # noqa: E402
-from funrec.models import WDL, DeepFM  # noqa: E402
+from funrec.layers import DNN, PredictionLayer
+from funrec.models import WDL, DeepFM
 
 
 def test_top_level_package_imports():
@@ -135,13 +133,51 @@ def test_check_version_never_makes_a_real_network_call():
     fake_response = MagicMock()
     fake_response.status_code = 200
     fake_response.text = json.dumps({"releases": {}})
+    fake_response.raise_for_status.return_value = None
 
     with (
         patch.object(utils, "Thread", ImmediateThread),
         patch.object(utils.requests, "get", return_value=fake_response) as mock_get,
     ):
         utils.check_version("1.0.0")
-        mock_get.assert_called_once()
+        mock_get.assert_called_once_with(
+            "https://pypi.org/pypi/deepctr-torch/json", timeout=5
+        )
+
+
+def test_check_version_handles_request_failure():
+    """网络失败必须在后台任务内被记录，且不泄漏为未处理异常。"""
+    from funrec import utils
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=(), **_kwargs):
+            self._target = target
+            self._args = args
+
+        def start(self):
+            self._target(*self._args)
+
+    with (
+        patch.object(utils, "Thread", ImmediateThread),
+        patch.object(
+            utils.requests,
+            "get",
+            side_effect=utils.requests.Timeout("timed out"),
+        ),
+        patch.object(utils.logger, "error") as log_error,
+    ):
+        utils.check_version("1.0.0")
+        assert "检查 deepctr-torch 版本失败" in log_error.call_args.args[0]
+
+
+def test_mind_train_import_does_not_read_data():
+    """导入训练模块不得读取 CSV 或启动训练。"""
+    import importlib
+
+    with patch("pandas.read_csv") as read_csv:
+        module = importlib.import_module("funrec.models.p2019.mind.train")
+        assert callable(module.main)
+        read_csv.assert_not_called()
 
 
 def test_callbacks_module_importable_and_defines_expected_names():

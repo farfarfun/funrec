@@ -1,44 +1,60 @@
-# -*- coding:utf-8 -*-
-""" """
+"""funrec 通用工具。"""
 
 import json
 from threading import Thread
 
 import requests
 from farlog import getLogger
-from packaging.version import parse
+from packaging.version import InvalidVersion, parse
 
 logger = getLogger("funrec")
 
 
-def check_version(version):
-    """Return version of package on pypi.python.org using json."""
+def check_version(version: str) -> None:
+    """后台检查 PyPI 上的最新版本，不阻塞调用方。"""
 
-    def check(version):
+    def check(current_version: str) -> None:
+        url = "https://pypi.org/pypi/deepctr-torch/json"
         try:
-            url_pattern = "https://pypi.python.org/pypi/deepctr-torch/json"
-            req = requests.get(url_pattern)
-            latest_version = parse("0")
-            version = parse(version)
-            if req.status_code == requests.codes.ok:
-                j = json.loads(req.text.encode("utf-8"))
-                releases = j.get("releases", [])
-                for release in releases:
-                    ver = parse(release)
-                    if ver.is_prerelease or ver.is_postrelease:
-                        continue
-                    latest_version = max(latest_version, ver)
-                if latest_version > version:
-                    logger.warning(
-                        "\nDeepCTR-PyTorch version {0} detected. Your version is {1}.\nUse `pip install -U deepctr-torch` to upgrade.Changelog: https://github.com/shenweichen/DeepCTR-Torch/releases/tag/v{0}".format(
-                            latest_version, version
-                        )
-                    )
-        except Exception as e:
-            logger.error(e)
+            response = requests.get(url, timeout=5)
+            response.raise_for_status()
+        except requests.RequestException as exc:
             logger.error(
-                "Please check the latest version manually on https://pypi.org/project/deepctr-torch/#history"
+                "检查 deepctr-torch 版本失败，URL={}，当前版本={}：{}",
+                url,
+                current_version,
+                exc,
             )
             return
 
-    Thread(target=check, args=(version,)).start()
+        try:
+            releases = json.loads(response.text).get("releases", {})
+            installed_version = parse(current_version)
+        except (json.JSONDecodeError, AttributeError, TypeError, InvalidVersion) as exc:
+            logger.error(
+                "解析 deepctr-torch 版本响应失败，URL={}，当前版本={}：{}",
+                url,
+                current_version,
+                exc,
+            )
+            return
+
+        latest_version = parse("0")
+        for release in releases:
+            try:
+                candidate = parse(release)
+            except (InvalidVersion, TypeError):
+                logger.warning("跳过无法解析的 deepctr-torch 版本：{}", release)
+                continue
+            if not candidate.is_prerelease and not candidate.is_postrelease:
+                latest_version = max(latest_version, candidate)
+
+        if latest_version > installed_version:
+            logger.warning(
+                "检测到 DeepCTR-PyTorch 新版本 {}，当前版本 {}。"
+                "请运行 `pip install -U deepctr-torch` 升级。",
+                latest_version,
+                installed_version,
+            )
+
+    Thread(target=check, args=(version,), daemon=True).start()

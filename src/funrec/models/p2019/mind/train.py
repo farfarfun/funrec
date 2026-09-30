@@ -1,18 +1,13 @@
-import torch
-
-
-from torch.utils.data import Dataset, DataLoader
-
-
-import pandas as pd
-import numpy as np
-import os
 import math
+import os
 import random
+
+import numpy as np
+import torch
 from sklearn.preprocessing import normalize
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from sklearn.manifold import TSNE
-from matplotlib import pyplot as plt
+
 from .core import MIND
 
 
@@ -122,7 +117,7 @@ def save_model(model, path):
 def load_model(model, path):
     state_dict = torch.load(path + "model.pth")
     model.load_state_dict(state_dict)
-    print("model loaded from %s" % path)
+    print(f"model loaded from {path}")
     return model
 
 
@@ -139,8 +134,8 @@ def get_predict(model, test_data, hidden_size, topN=20):
     gpu_index = faiss.IndexFlatIP(hidden_size)
     gpu_index.add(item_embs)
 
-    test_gd = dict()
-    preds = dict()
+    test_gd = {}
+    preds = {}
 
     user_id = 0
 
@@ -176,8 +171,6 @@ def get_predict(model, test_data, hidden_size, topN=20):
 
             # 每个用户的label列表，此处item_id为一个二维list，验证和测试是多label的
             for i, iid_list in enumerate(targets):
-                recall = 0
-                dcg = 0.0
                 item_list_set = []
 
                 # 将num_interest个兴趣向量的所有topN近邻物品（num_interest*topN个物品）集合起来按照距离重新排序
@@ -205,17 +198,17 @@ def evaluate(preds, test_gd, topN=50):
     total_recall = 0.0
     total_ndcg = 0.0
     total_hitrate = 0
-    for user in test_gd.keys():
+    for user in test_gd:
         recall = 0
         dcg = 0.0
         item_list = test_gd[user]
         for no, item_id in enumerate(item_list):
             if item_id in preds[user][:topN]:
                 recall += 1
-                dcg += 1.0 / math.log(no + 2, 2)
+                dcg += 1.0 / math.log2(no + 2)
             idcg = 0.0
             for no in range(recall):
-                idcg += 1.0 / math.log(no + 2, 2)
+                idcg += 1.0 / math.log2(no + 2)
         total_recall += recall * 1.0 / len(item_list)
         if recall > 0:
             total_ndcg += dcg / idcg
@@ -233,103 +226,13 @@ def evaluate_model(model, test_loader, embedding_dim, topN=20):
     return evaluate(preds, test_gd, topN=topN)
 
 
-# 读取数据
-train_df = pd.read_csv(config["train_path"])
-valid_df = pd.read_csv(config["valid_path"])
-test_df = pd.read_csv(config["test_path"])
-train_dataset = SeqnenceDataset(config, train_df, phase="train")
-valid_dataset = SeqnenceDataset(config, valid_df, phase="test")
-test_dataset = SeqnenceDataset(config, test_df, phase="test")
-train_loader = DataLoader(
-    dataset=train_dataset, batch_size=config["batch_size"], shuffle=True, num_workers=8
-)
-valid_loader = DataLoader(
-    dataset=valid_dataset,
-    batch_size=config["batch_size"],
-    shuffle=False,
-    collate_fn=my_collate,
-)
-test_loader = DataLoader(
-    dataset=test_dataset,
-    batch_size=config["batch_size"],
-    shuffle=False,
-    collate_fn=my_collate,
-)
-
-
-model = MIND(config)
-# model = SRGNN(config)
-optimizer = torch.optim.Adam(params=model.parameters(), lr=config["lr"])
-# optimizer = torch.optimizer.Adam(parameters=model.parameters(), learning_rate=config['lr'])
-log_df = pd.DataFrame()
-best_reacall = -1
-
-exp_path = "./ml-20m_softmax/MIND_{}_{}_{}/".format(
-    config["lr"], config["batch_size"], config["embedding_dim"]
-)
-os.makedirs(exp_path, exist_ok=True, mode=0o777)
-patience = 5
-last_improve_epoch = 1
-log_csv = exp_path + "log.csv"
-# *****************************************************train*********************************************
-for epoch in range(1, 1 + config["Epoch"]):
-    # try :
-    pbar = tqdm(train_loader)
-    model.train()
-    loss_list = []
-    acc_50_list = []
-    print()
-    print("Training:")
-    print()
-    for batch_data in pbar:
-        (item_seq, mask, item) = batch_data
-
-        output_dict = model(item_seq, mask, item)
-        loss = output_dict["loss"]
-
-        loss.backward()
-        optimizer.step()
-        # optimizer.clear_grad()
-        optimizer.zero_grad()
-
-        loss_list.append(loss.item())
-
-        pbar.set_description("Epoch [{}/{}]".format(epoch, config["Epoch"]))
-        pbar.set_postfix(loss=np.mean(loss_list))
-    # *****************************************************valid*********************************************
-
-    print("Valid")
-    recall_metric = evaluate_model(
-        model, valid_loader, config["embedding_dim"], topN=50
-    )
-    print(recall_metric)
-    recall_metric["phase"] = "valid"
-    log_df = log_df.append(recall_metric, ignore_index=True)
-    log_df.to_csv(log_csv)
-
-    if recall_metric["recall@50"] > best_reacall:
-        save_model(model, exp_path)
-        best_reacall = recall_metric["recall@50"]
-        last_improve_epoch = epoch
-
-    if epoch - last_improve_epoch > patience:
-        break
-
-print("Testing")
-model = load_model(model, exp_path)
-recall_metric = evaluate_model(model, test_loader, config["embedding_dim"], topN=50)
-print(recall_metric)
-recall_metric["phase"] = "test"
-log_df = log_df.append(recall_metric, ignore_index=True)
-log_df.to_csv(log_csv)
-
-
-# embedding分布可视化
 def plot_embedding(data, title):
+    from matplotlib import pyplot as plt
+
     x_min, x_max = np.min(data, 0), np.max(data, 0)
     data = (data - x_min) / (x_max - x_min)
 
-    fig = plt.figure(dpi=120)
+    plt.figure(dpi=120)
     plt.scatter(data[:, 0], data[:, 1], marker=".")
 
     plt.xticks([])
@@ -338,6 +241,95 @@ def plot_embedding(data, title):
     plt.show()
 
 
-item_emb = model.output_items().detach().numpy()
-tsne_emb = TSNE(n_components=2).fit_transform(item_emb)
-plot_embedding(tsne_emb, "MIND Item Embedding")
+def main(training_config: dict[str, object] | None = None) -> None:
+    """读取指定配置的数据，训练 MIND 模型并输出评估与嵌入图。"""
+    import pandas as pd
+    from sklearn.manifold import TSNE
+
+    active_config = config if training_config is None else training_config
+    train_df = pd.read_csv(active_config["train_path"])
+    valid_df = pd.read_csv(active_config["valid_path"])
+    test_df = pd.read_csv(active_config["test_path"])
+    train_dataset = SeqnenceDataset(active_config, train_df, phase="train")
+    valid_dataset = SeqnenceDataset(active_config, valid_df, phase="test")
+    test_dataset = SeqnenceDataset(active_config, test_df, phase="test")
+    train_loader = DataLoader(
+        dataset=train_dataset,
+        batch_size=active_config["batch_size"],
+        shuffle=True,
+        num_workers=8,
+    )
+    valid_loader = DataLoader(
+        dataset=valid_dataset,
+        batch_size=active_config["batch_size"],
+        shuffle=False,
+        collate_fn=my_collate,
+    )
+    test_loader = DataLoader(
+        dataset=test_dataset,
+        batch_size=active_config["batch_size"],
+        shuffle=False,
+        collate_fn=my_collate,
+    )
+
+    model = MIND(active_config)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=active_config["lr"])
+    log_df = pd.DataFrame()
+    best_reacall = -1
+    exp_path = "./ml-20m_softmax/MIND_{}_{}_{}/".format(
+        active_config["lr"],
+        active_config["batch_size"],
+        active_config["embedding_dim"],
+    )
+    os.makedirs(exp_path, exist_ok=True, mode=0o777)
+    patience = 5
+    last_improve_epoch = 1
+    log_csv = exp_path + "log.csv"
+
+    for epoch in range(1, 1 + active_config["Epoch"]):
+        pbar = tqdm(train_loader)
+        model.train()
+        loss_list = []
+        print("\nTraining:\n")
+        for item_seq, mask, item in pbar:
+            loss = model(item_seq, mask, item)["loss"]
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            loss_list.append(loss.item())
+            pbar.set_description("Epoch [{}/{}]".format(epoch, active_config["Epoch"]))
+            pbar.set_postfix(loss=np.mean(loss_list))
+
+        print("Valid")
+        recall_metric = evaluate_model(
+            model, valid_loader, active_config["embedding_dim"], topN=50
+        )
+        print(recall_metric)
+        recall_metric["phase"] = "valid"
+        log_df = pd.concat([log_df, pd.DataFrame([recall_metric])], ignore_index=True)
+        log_df.to_csv(log_csv)
+
+        if recall_metric["recall@50"] > best_reacall:
+            save_model(model, exp_path)
+            best_reacall = recall_metric["recall@50"]
+            last_improve_epoch = epoch
+        if epoch - last_improve_epoch > patience:
+            break
+
+    print("Testing")
+    model = load_model(model, exp_path)
+    recall_metric = evaluate_model(
+        model, test_loader, active_config["embedding_dim"], topN=50
+    )
+    print(recall_metric)
+    recall_metric["phase"] = "test"
+    log_df = pd.concat([log_df, pd.DataFrame([recall_metric])], ignore_index=True)
+    log_df.to_csv(log_csv)
+
+    item_emb = model.output_items().detach().numpy()
+    tsne_emb = TSNE(n_components=2).fit_transform(item_emb)
+    plot_embedding(tsne_emb, "MIND Item Embedding")
+
+
+if __name__ == "__main__":
+    main()
