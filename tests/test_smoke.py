@@ -29,6 +29,7 @@ from funrec.inputs import (
     get_feature_names,
 )
 from funrec.layers import DNN, PredictionLayer
+from funrec.layers.utils import slice_arrays
 from funrec.models import WDL, DeepFM
 
 
@@ -65,6 +66,19 @@ def test_feature_columns_and_input_index():
     assert get_feature_names(feature_columns) == ["user_id", "price", "hist_item"]
 
 
+def test_build_input_features_rejects_unknown_feature_column():
+    """特征索引构建器应明确拒绝不支持的特征列类型。"""
+    with pytest.raises(TypeError):
+        build_input_features([object()])
+
+
+def test_slice_arrays_handles_none_and_rejects_ambiguous_indices():
+    """数组切片工具应覆盖空输入，并拒绝同时传入索引列表和结束位置。"""
+    assert slice_arrays(None) == [None]
+    with pytest.raises(ValueError):
+        slice_arrays([torch.arange(3)], [0, 1], 2)
+
+
 def test_dnn_and_prediction_layer_forward():
     """Exercise a couple of low-level building blocks with a tiny random batch."""
     dnn = DNN(inputs_dim=8, hidden_units=(16, 4))
@@ -78,6 +92,12 @@ def test_dnn_and_prediction_layer_forward():
     pred = prediction_layer(logit)
     assert pred.shape == (3, 1)
     assert torch.all((pred >= 0) & (pred <= 1))
+
+
+def test_prediction_layer_rejects_unknown_task():
+    """预测层应拒绝未定义的任务类型。"""
+    with pytest.raises(ValueError):
+        PredictionLayer(task="unknown")
 
 
 @pytest.mark.parametrize("model_cls", [WDL, DeepFM])
@@ -168,6 +188,31 @@ def test_check_version_handles_request_failure():
     ):
         utils.check_version("1.0.0")
         assert "检查 deepctr-torch 版本失败" in log_error.call_args.args[0]
+
+
+def test_check_version_handles_invalid_response():
+    """版本接口返回非对象 JSON 时应记录解析上下文并结束后台任务。"""
+    from funrec import utils
+
+    class ImmediateThread:
+        def __init__(self, target=None, args=(), **_kwargs):
+            self._target = target
+            self._args = args
+
+        def start(self):
+            self._target(*self._args)
+
+    fake_response = MagicMock()
+    fake_response.text = "[]"
+    fake_response.raise_for_status.return_value = None
+
+    with (
+        patch.object(utils, "Thread", ImmediateThread),
+        patch.object(utils.requests, "get", return_value=fake_response),
+        patch.object(utils.logger, "error") as log_error,
+    ):
+        utils.check_version("1.0.0")
+        assert "解析 deepctr-torch 版本响应失败" in log_error.call_args.args[0]
 
 
 def test_mind_train_import_does_not_read_data():

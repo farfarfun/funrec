@@ -1,8 +1,9 @@
-# -*- coding:utf-8 -*-
 """
 Reference:
     [1] Guo H, Tang R, Ye Y, et al. Deepfm: a factorization-machine based neural network for ctr prediction[J]. arXiv preprint arXiv:1703.04247, 2017.(https://arxiv.org/abs/1703.04247)
 """
+
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -13,47 +14,41 @@ from funrec.models.b2000 import BaseModel
 
 
 class DeepFM(BaseModel):
-    """Instantiates the DeepFM Network architecture.
+    """实现同时组合线性、因子分解机和深度网络的 DeepFM 模型。
 
-    :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param use_fm: bool,use FM part or not
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of DNN
-    :param l2_reg_linear: float. L2 regularizer strength applied to linear part
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param l2_reg_dnn: float. L2 regularizer strength applied to DNN
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_activation: Activation function to use in DNN
-    :param dnn_use_bn: bool. Whether use BatchNormalization before activation or not in DNN
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        linear_feature_columns: 线性部分使用的特征列。
+        dnn_feature_columns: 深度网络部分使用的特征列。
+        use_fm: 是否启用因子分解机部分。
+        dnn_hidden_units: 深度网络各隐藏层的单元数。
+        task: 任务类型，支持 ``binary`` 和 ``regression``。
+        device: 运行设备，例如 ``cpu`` 或 ``cuda:0``。
+        gpus: 用于并行计算的 GPU 编号或设备列表。
 
+    返回:
+        初始化后的 PyTorch DeepFM 模型。
     """
 
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        use_fm=True,
-        dnn_hidden_units=(256, 128),
-        l2_reg_linear=0.00001,
-        l2_reg_embedding=0.00001,
-        l2_reg_dnn=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        dnn_use_bn=False,
-        task="binary",
-        device="cpu",
-        gpus=None,
-        *args,
-        **kwargs,
-    ):
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        use_fm: bool = True,
+        dnn_hidden_units: tuple[int, ...] = (256, 128),
+        l2_reg_linear: float = 0.00001,
+        l2_reg_embedding: float = 0.00001,
+        l2_reg_dnn: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        dnn_use_bn: bool = False,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         super(DeepFM, self).__init__(
             linear_feature_columns,
             dnn_feature_columns,
@@ -96,7 +91,8 @@ class DeepFM(BaseModel):
             self.add_regularization_weight(self.dnn_linear.weight, l2=l2_reg_dnn)
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """根据批量特征张量计算预测结果。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )

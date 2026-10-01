@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 from farlog import getLogger
 
@@ -5,13 +7,15 @@ try:
     from tensorflow.python.keras.callbacks import CallbackList, EarlyStopping, History
     from tensorflow.python.keras.callbacks import ModelCheckpoint as _ModelCheckpoint
 except ImportError:
+
     class _Callback:
         """PyTorch 项目使用的轻量回调基类。"""
 
-        def __init__(self, *args, **kwargs):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
             self.model = None
 
-        def set_model(self, model):
+        def set_model(self, model: torch.nn.Module) -> None:
+            """设置回调所操作的模型。"""
             self.model = model
 
     class CallbackList(list):
@@ -30,9 +34,18 @@ except ImportError:
     class _ModelCheckpoint(_Callback):
         """提供 ModelCheckpoint 所需的最小配置接口。"""
 
-        def __init__(self, filepath, monitor="val_loss", verbose=0,
-                     save_best_only=False, mode="auto", save_weights_only=False,
-                     period=1, *args, **kwargs):
+        def __init__(
+            self,
+            filepath: str,
+            monitor: str = "val_loss",
+            verbose: int = 0,
+            save_best_only: bool = False,
+            mode: str = "auto",
+            save_weights_only: bool = False,
+            period: int = 1,
+            *args: Any,
+            **kwargs: Any,
+        ) -> None:
             super().__init__(*args, **kwargs)
             self.filepath = filepath
             self.monitor = monitor
@@ -42,7 +55,12 @@ except ImportError:
             self.period = period
             self.epochs_since_last_save = 0
             self.best = float("inf") if mode == "min" else float("-inf")
-            self.monitor_op = (lambda current, best: current < best) if mode == "min" else (lambda current, best: current > best)
+            self.monitor_op = (
+                (lambda current, best: current < best)
+                if mode == "min"
+                else (lambda current, best: current > best)
+            )
+
 
 from funrec.layers import DNN
 
@@ -52,38 +70,23 @@ logger = getLogger("funrec")
 
 
 class ModelCheckpoint(_ModelCheckpoint):
-    """Save the model after every epoch.
+    """在训练轮次结束时按条件保存模型检查点。
 
-    `filepath` can contain named formatting options,
-    which will be filled the value of `epoch` and
-    keys in `logs` (passed in `on_epoch_end`).
+    参数:
+        filepath: 保存路径模板，可引用 ``epoch`` 和日志中的指标名称。
+        monitor: 用于判断最佳模型的指标名称。
+        verbose: 输出级别，取 0 或 1。
+        save_best_only: 是否仅保存监控指标更优的模型。
+        mode: 指标比较方式，支持 ``auto``、``min`` 和 ``max``。
+        save_weights_only: 是否仅保存模型权重。
+        period: 两次检查点保存之间的训练轮数。
 
-    For example: if `filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`,
-    then the model checkpoints will be saved with the epoch number and
-    the validation loss in the filename.
-
-    Arguments:
-        filepath: string, path to save the model file.
-        monitor: quantity to monitor.
-        verbose: verbosity mode, 0 or 1.
-        save_best_only: if `save_best_only=True`,
-            the latest best model according to
-            the quantity monitored will not be overwritten.
-        mode: one of {auto, min, max}.
-            If `save_best_only=True`, the decision
-            to overwrite the current save file is made
-            based on either the maximization or the
-            minimization of the monitored quantity. For `val_acc`,
-            this should be `max`, for `val_loss` this should
-            be `min`, etc. In `auto` mode, the direction is
-            automatically inferred from the name of the monitored quantity.
-        save_weights_only: if True, then only the model's weights will be
-            saved (`model.save_weights(filepath)`), else the full model
-            is saved (`model.save(filepath)`).
-        period: Interval (number of epochs) between checkpoints.
+    返回:
+        初始化后的检查点回调对象。
     """
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: dict[str, float] | None = None) -> None:
+        """处理轮次结束事件，并在满足条件时写入检查点。"""
         logs = logs or {}
         self.epochs_since_last_save += 1
         if self.epochs_since_last_save >= self.period:

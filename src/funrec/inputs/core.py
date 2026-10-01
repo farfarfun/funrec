@@ -115,7 +115,9 @@ def get_feature_names(feature_columns: list[Any]) -> list[str]:
 #     return list(chain(*list(map(lambda x: x.values(), filter(lambda x: x is not None, inputs)))))
 
 
-def build_input_features(feature_columns: list[Any]) -> OrderedDict[str, tuple[int, int]]:
+def build_input_features(
+    feature_columns: list[Any],
+) -> OrderedDict[str, tuple[int, int]]:
     """构建特征名称到输入张量切片范围的映射。"""
 
     features = OrderedDict()
@@ -191,8 +193,7 @@ def get_varlen_pooling_list(
 def create_embedding_matrix(
     feature_columns, init_std=0.0001, linear=False, sparse=False, device="cpu"
 ) -> nn.ModuleDict:
-    # Return nn.ModuleDict: for sparse features, {embedding_name: nn.Embedding}
-    # for varlen sparse features, {embedding_name: nn.EmbeddingBag}
+    # 返回稀疏特征和变长稀疏特征对应的嵌入模块映射
     sparse_feature_columns = (
         list(filter(lambda x: isinstance(x, SparseFeat), feature_columns))
         if len(feature_columns)

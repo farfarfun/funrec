@@ -2,6 +2,7 @@
 
 
 import time
+from typing import Any
 
 import numpy as np
 import torch
@@ -34,18 +35,18 @@ logger = getLogger("funrec")
 class BaseModel(nn.Module):
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        l2_reg_linear=1e-5,
-        l2_reg_embedding=1e-5,
-        init_std=0.0001,
-        seed=1024,
-        task="binary",
-        device="cpu",
-        gpus=None,
-        *args,
-        **kwargs,
-    ):
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        l2_reg_linear: float = 1e-5,
+        l2_reg_embedding: float = 1e-5,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> None:
         super(BaseModel, self).__init__(*args, **kwargs)
         torch.manual_seed(seed)
         self.dnn_feature_columns = dnn_feature_columns
@@ -89,32 +90,33 @@ class BaseModel(nn.Module):
 
     def fit(
         self,
-        x=None,
-        y=None,
-        batch_size=None,
-        epochs=1,
-        verbose=1,
-        initial_epoch=0,
-        validation_split=0.0,
-        validation_data=None,
-        shuffle=True,
-        callbacks=None,
-    ):
-        """
+        x: list[np.ndarray] | dict[str, np.ndarray] | None = None,
+        y: np.ndarray | None = None,
+        batch_size: int | None = None,
+        epochs: int = 1,
+        verbose: int = 1,
+        initial_epoch: int = 0,
+        validation_split: float = 0.0,
+        validation_data: tuple[Any, ...] | None = None,
+        shuffle: bool = True,
+        callbacks: list[Any] | None = None,
+    ) -> History:
+        """训练模型并返回各轮训练和验证指标。
 
-        :param x: Numpy array of training data (if the model has a single input), or list of Numpy arrays (if the model has multiple inputs).If input layers in the model are named, you can also pass a
-            dictionary mapping input names to Numpy arrays.
-        :param y: Numpy array of target (label) data (if the model has a single output), or list of Numpy arrays (if the model has multiple outputs).
-        :param batch_size: Integer or `None`. Number of samples per gradient update. If unspecified, `batch_size` will default to 256.
-        :param epochs: Integer. Number of epochs to train the model. An epoch is an iteration over the entire `x` and `y` data provided. Note that in conjunction with `initial_epoch`, `epochs` is to be understood as "final epoch". The model is not trained for a number of iterations given by `epochs`, but merely until the epoch of index `epochs` is reached.
-        :param verbose: Integer. 0, 1, or 2. Verbosity mode. 0 = silent, 1 = progress bar, 2 = one line per epoch.
-        :param initial_epoch: Integer. Epoch at which to start training (useful for resuming a previous training run).
-        :param validation_split: Float between 0 and 1. Fraction of the training data to be used as validation data. The model will set apart this fraction of the training data, will not train on it, and will evaluate the loss and any model metrics on this data at the end of each epoch. The validation data is selected from the last samples in the `x` and `y` data provided, before shuffling.
-        :param validation_data: tuple `(x_val, y_val)` or tuple `(x_val, y_val, val_sample_weights)` on which to evaluate the loss and any model metrics at the end of each epoch. The model will not be trained on this data. `validation_data` will override `validation_split`.
-        :param shuffle: Boolean. Whether to shuffle the order of the batches at the beginning of each epoch.
-        :param callbacks: List of `functr.callbacks.Callback` instances. List of callbacks to apply during training and validation (if ). See [callbacks](https://tensorflow.google.cn/api_docs/python/tf/keras/callbacks). Now available: `EarlyStopping` , `ModelCheckpoint`
+        参数:
+            x: 按特征排列的训练数组列表或名称到数组的映射。
+            y: 训练标签数组。
+            batch_size: 每次梯度更新使用的样本数，默认 256。
+            epochs: 训练结束轮次。
+            verbose: 输出级别，0 表示静默，1 表示进度条，2 表示逐轮输出。
+            initial_epoch: 起始轮次，用于继续训练。
+            validation_split: 从训练数据末尾划出的验证集比例。
+            validation_data: ``(x, y)`` 或 ``(x, y, sample_weight)`` 验证数据。
+            shuffle: 是否在每轮开始前打乱数据。
+            callbacks: 训练期间调用的回调列表。
 
-        :return: A `History` object. Its `History.history` attribute is a record of training loss values and metrics values at successive epochs, as well as validation loss values and validation metrics values (if applicable).
+        返回:
+            记录训练和验证指标的 ``History`` 对象。
         """
         if isinstance(x, dict):
             x = [x[feature] for feature in self.feature_index]
@@ -286,13 +288,21 @@ class BaseModel(nn.Module):
 
         return self.history
 
-    def evaluate(self, x, y, batch_size=256):
-        """
+    def evaluate(
+        self,
+        x: list[np.ndarray] | dict[str, np.ndarray],
+        y: np.ndarray,
+        batch_size: int = 256,
+    ) -> dict[str, float]:
+        """使用测试数据计算已配置的指标。
 
-        :param x: Numpy array of test data (if the model has a single input), or list of Numpy arrays (if the model has multiple inputs).
-        :param y: Numpy array of target (label) data (if the model has a single output), or list of Numpy arrays (if the model has multiple outputs).
-        :param batch_size: Integer or `None`. Number of samples per evaluation step. If unspecified, `batch_size` will default to 256.
-        :return: Dict contains metric names and metric values.
+        参数:
+            x: 按特征排列的测试数组列表或名称到数组的映射。
+            y: 测试标签数组。
+            batch_size: 每个评估批次的样本数。
+
+        返回:
+            指标名称到指标值的映射。
         """
         pred_ans = self.predict(x, batch_size)
         eval_result = {}
@@ -300,12 +310,19 @@ class BaseModel(nn.Module):
             eval_result[name] = metric_fun(y, pred_ans)
         return eval_result
 
-    def predict(self, x, batch_size=256):
-        """
+    def predict(
+        self,
+        x: list[np.ndarray] | dict[str, np.ndarray],
+        batch_size: int = 256,
+    ) -> np.ndarray:
+        """分批计算输入数据的预测值。
 
-        :param x: The input data, as a Numpy array (or list of Numpy arrays if the model has multiple inputs).
-        :param batch_size: Integer. If unspecified, it will default to 256.
-        :return: Numpy array(s) of predictions.
+        参数:
+            x: 按特征排列的输入数组列表或名称到数组的映射。
+            batch_size: 每个预测批次的样本数。
+
+        返回:
+            模型预测值数组。
         """
         model = self.eval()
         if isinstance(x, dict):
@@ -330,8 +347,13 @@ class BaseModel(nn.Module):
         return np.concatenate(pred_ans).astype("float64")
 
     def input_from_feature_columns(
-        self, X, feature_columns, embedding_dict, support_dense=True
-    ):
+        self,
+        X: torch.Tensor,
+        feature_columns: list[Any],
+        embedding_dict: nn.ModuleDict,
+        support_dense: bool = True,
+    ) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+        """从输入张量提取稀疏嵌入和连续特征值。"""
         sparse_feature_columns = (
             list(filter(lambda x: isinstance(x, SparseFeat), feature_columns))
             if len(feature_columns)
@@ -382,11 +404,12 @@ class BaseModel(nn.Module):
 
     def compute_input_dim(
         self,
-        feature_columns,
-        include_sparse=True,
-        include_dense=True,
-        feature_group=False,
-    ):
+        feature_columns: list[Any],
+        include_sparse: bool = True,
+        include_dense: bool = True,
+        feature_group: bool = False,
+    ) -> int:
+        """计算指定特征列形成的模型输入维度。"""
         sparse_feature_columns = (
             list(
                 filter(
@@ -417,19 +440,22 @@ class BaseModel(nn.Module):
             input_dim += dense_input_dim
         return input_dim
 
-    def add_regularization_weight(self, weight_list, l1=0.0, l2=0.0):
-        # For a Parameter, put it in a list to keep Compatible with get_regularization_loss()
+    def add_regularization_weight(
+        self, weight_list: Any, l1: float = 0.0, l2: float = 0.0
+    ) -> None:
+        """登记需要计算 L1 或 L2 正则损失的参数。"""
+        # 将单个参数包装为列表，以兼容正则损失的统一处理
         if isinstance(weight_list, nn.parameter.Parameter):
             weight_list = [weight_list]
-        # For generators, filters and ParameterLists, convert them to a list of tensors to avoid bugs.
-        # e.g., we can't pickle generator objects when we save the model.
+        # 将生成器和参数列表实体化，避免保存模型时无法序列化
         else:
             weight_list = list(weight_list)
         self.regularization_weight.append((weight_list, l1, l2))
 
     def get_regularization_loss(
         self,
-    ):
+    ) -> torch.Tensor:
+        """计算已登记参数的正则损失。"""
         total_reg_loss = torch.zeros((1,), device=self.device)
         for weight_list, l1, l2 in self.regularization_weight:
             for w in weight_list:
@@ -447,19 +473,25 @@ class BaseModel(nn.Module):
 
         return total_reg_loss
 
-    def add_auxiliary_loss(self, aux_loss, alpha):
+    def add_auxiliary_loss(self, aux_loss: torch.Tensor, alpha: float) -> None:
+        """设置按给定系数缩放的辅助损失。"""
         self.aux_loss = aux_loss * alpha
 
     def compile(
         self,
-        optimizer,
-        loss=None,
-        metrics=None,
-    ):
-        """
-        :param optimizer: String (name of optimizer) or optimizer instance. See [optimizers](https://pytorch.org/docs/stable/optim.html).
-        :param loss: String (name of objective function) or objective function. See [losses](https://pytorch.org/docs/stable/nn.functional.html#loss-functions).
-        :param metrics: List of metrics to be evaluated by the model during training and testing. Typically you will use `metrics=['accuracy']`.
+        optimizer: str | torch.optim.Optimizer,
+        loss: str | list[str] | Any | None = None,
+        metrics: list[str] | None = None,
+    ) -> None:
+        """配置训练使用的优化器、损失函数和评估指标。
+
+        参数:
+            optimizer: 优化器名称或 PyTorch 优化器实例。
+            loss: 损失函数名称、名称列表或可调用对象。
+            metrics: 训练和测试期间计算的指标名称列表。
+
+        返回:
+            无返回值。
         """
         self.metrics_names = ["loss"]
         self.optim = self._get_optim(optimizer)
@@ -539,7 +571,8 @@ class BaseModel(nn.Module):
     @property
     def embedding_size(
         self,
-    ):
+    ) -> int:
+        """返回所有稀疏特征共用的嵌入维度。"""
         feature_columns = self.dnn_feature_columns
         sparse_feature_columns = (
             list(

@@ -1,38 +1,42 @@
-# -*- coding:utf-8 -*-
+from typing import Any
 
 import numpy as np
 import torch
 
 
-def concat_fun(inputs, axis=-1):
+def concat_fun(inputs: list[torch.Tensor], axis: int = -1) -> torch.Tensor:
+    """沿指定维度拼接张量；只有一个张量时直接返回该张量。
+
+    参数:
+        inputs: 待拼接的张量列表。
+        axis: 拼接维度，默认使用最后一个维度。
+
+    返回:
+        拼接后的张量。
+    """
     if len(inputs) == 1:
         return inputs[0]
     else:
         return torch.cat(inputs, dim=axis)
 
 
-def slice_arrays(arrays, start=None, stop=None):
-    """Slice an array or list of arrays.
+def slice_arrays(
+    arrays: Any | list[Any] | None,
+    start: int | list[int] | np.ndarray | None = None,
+    stop: int | None = None,
+) -> Any | list[Any]:
+    """按范围或索引集合切分一个数组或一组数组。
 
-    This takes an array-like, or a list of
-    array-likes, and outputs:
-        - arrays[start:stop] if `arrays` is an array-like
-        - [x[start:stop] for x in arrays] if `arrays` is a list
+    参数:
+        arrays: 单个类数组对象、类数组对象列表或 ``None``。
+        start: 起始位置，或需要选取的索引列表/数组。
+        stop: 结束位置；``start`` 为索引列表时必须为 ``None``。
 
-    Can also work on list/array of indices: `slice_arrays(x, indices)`
+    返回:
+        与输入结构对应的切片；输入为 ``None`` 时返回 ``[None]``。
 
-    Arguments:
-        arrays: Single array or list of arrays.
-        start: can be an integer index (start index)
-            or a list/array of indices
-        stop: integer (stop index); should be None if
-            `start` was a list.
-
-    Returns:
-        A slice of the array(s).
-
-    Raises:
-        ValueError: If the value of start is a list and stop is not None.
+    异常:
+        ValueError: ``start`` 为列表且同时提供了 ``stop``。
     """
 
     if arrays is None:
@@ -47,7 +51,7 @@ def slice_arrays(arrays, start=None, stop=None):
         )
     elif isinstance(arrays, list):
         if hasattr(start, "__len__"):
-            # hdf5 datasets only support list objects as indices
+            # HDF5 数据集仅支持使用列表作为索引
             if hasattr(start, "shape"):
                 start = start.tolist()
             return [None if x is None else x[start] for x in arrays]
