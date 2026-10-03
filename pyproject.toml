@@ -1,6 +1,6 @@
 [project]
 name = "funrec"
-version = "0.0.10"
+version = "0.0.9"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.10"
