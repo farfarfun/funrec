@@ -4,6 +4,8 @@ Reference:
     [1] He X, Chua T S. Neural factorization machines for sparse predictive analytics[C]//Proceedings of the 40th International ACM SIGIR conference on Research and Development in Information Retrieval. ACM, 2017: 355-364. (https://arxiv.org/abs/1708.05027)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -13,43 +15,46 @@ from funrec.models.b2000 import BaseModel
 
 
 class NFM(BaseModel):
-    """Instantiates the NFM Network architecture.
+    """神经因子分解机（NFM）网络架构。
 
-    :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of deep net
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param l2_reg_linear: float. L2 regularizer strength applied to linear part.
-    :param l2_reg_dnn: float . L2 regularizer strength applied to DNN
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param biout_dropout: When not ``None``, the probability we will drop out the output of BiInteractionPooling Layer.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_activation: Activation function to use in deep net
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        linear_feature_columns: 线性部分使用的特征列。
+        dnn_feature_columns: 深度部分使用的特征列。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_linear: 线性部分的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        bi_dropout: BiInteractionPooling 层输出的 dropout 比例。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_activation: DNN 使用的激活函数。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] He X, Chua T S. Neural factorization machines for sparse predictive analytics[C]//Proceedings of the 40th International ACM SIGIR conference on Research and Development in Information Retrieval. ACM, 2017: 355-364. (https://arxiv.org/abs/1708.05027)
     """
 
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        dnn_hidden_units=(128, 128),
-        l2_reg_embedding=1e-5,
-        l2_reg_linear=1e-5,
-        l2_reg_dnn=0,
-        init_std=0.0001,
-        seed=1024,
-        bi_dropout=0,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        dnn_hidden_units: tuple[int, ...] = (128, 128),
+        l2_reg_embedding: float = 1e-5,
+        l2_reg_linear: float = 1e-5,
+        l2_reg_dnn: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        bi_dropout: float = 0,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(NFM, self).__init__(
             linear_feature_columns,
             dnn_feature_columns,
@@ -88,7 +93,8 @@ class NFM(BaseModel):
             self.dropout = nn.Dropout(bi_dropout)
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行线性部分、双线性交互池化与 DNN 部分的前向计算并融合输出。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )

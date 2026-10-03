@@ -1,11 +1,39 @@
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import torch
-from keras.src.utils import pad_sequences
 from sklearn.preprocessing import LabelEncoder
 
 from funrec.inputs import SparseFeat, VarLenSparseFeat, get_feature_names
 from funrec.models import DeepFM
+
+DATA_DIR = Path(__file__).resolve().parent
+
+
+def pad_sequences(
+    sequences: list[list[int]], maxlen: int, padding: str = "post"
+) -> np.ndarray:
+    """将变长的整数序列填充为定长的二维数组（右侧补 0）。
+
+    避免引入整个 keras/tensorflow 依赖，仅实现本示例需要的最小填充逻辑。
+
+    参数:
+        sequences: 待填充的整数序列列表。
+        maxlen: 填充后的统一长度。
+        padding: 填充方向，``"post"`` 在序列末尾补 0，``"pre"`` 在序列开头补 0。
+
+    返回:
+        形状为 ``(len(sequences), maxlen)`` 的 int32 数组。
+    """
+    result = np.zeros((len(sequences), maxlen), dtype=np.int32)
+    for i, seq in enumerate(sequences):
+        trimmed = seq[-maxlen:]
+        if padding == "post":
+            result[i, : len(trimmed)] = trimmed
+        else:
+            result[i, maxlen - len(trimmed) :] = trimmed
+    return result
 
 
 def split(x):
@@ -18,7 +46,7 @@ def split(x):
 
 
 if __name__ == "__main__":
-    data = pd.read_csv("./movielens_sample.txt")
+    data = pd.read_csv(DATA_DIR / "movielens_sample.txt")
     sparse_features = [
         "movie_id",
         "user_id",

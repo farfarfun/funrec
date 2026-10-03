@@ -5,6 +5,8 @@ Reference:
     [1] Zhou G, Mou N, Fan Y, et al. Deep Interest Evolution Network for Click-Through Rate Prediction[J]. arXiv preprint arXiv:1809.03672, 2018. (https://arxiv.org/pdf/1809.03672.pdf)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -25,53 +27,56 @@ from funrec.models.b2000 import BaseModel
 
 
 class DIEN(BaseModel):
-    """Instantiates the Deep Interest Evolution Network architecture.
+    """深度兴趣演化网络（DIEN）架构。
 
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param history_feature_list: list,to indicate  sequence sparse field
-    :param gru_type: str,can be GRU AIGRU AUGRU AGRU
-    :param use_negsampling: bool, whether or not use negtive sampling
-    :param alpha: float ,weight of auxiliary_loss
-    :param use_bn: bool. Whether use BatchNormalization before activation or not in deep net
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of DNN
-    :param dnn_activation: Activation function to use in DNN
-    :param att_hidden_units: list,list of positive integer , the layer number and units in each layer of attention net
-    :param att_activation: Activation function to use in attention net
-    :param att_weight_normalization: bool.Whether normalize the attention score of local activation unit.
-    :param l2_reg_dnn: float. L2 regularizer strength applied to DNN
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        dnn_feature_columns: 深度部分使用的特征列。
+        history_feature_list: 需要作为历史行为序列处理的稀疏特征名列表。
+        gru_type: 兴趣演化层使用的 GRU 变体，可选 ``"GRU"``/``"AIGRU"``/``"AGRU"``/``"AUGRU"``。
+        use_negsampling: 是否使用负采样计算辅助损失。
+        alpha: 辅助损失（auxiliary loss）的权重。
+        use_bn: DNN 激活前是否使用 BatchNormalization。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        dnn_activation: DNN 使用的激活函数。
+        att_hidden_units: 注意力网络各隐藏层的单元数。
+        att_activation: 注意力网络使用的激活函数。
+        att_weight_normalization: 是否对局部激活单元的注意力分数做归一化。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Zhou G, Mou N, Fan Y, et al. Deep Interest Evolution Network for Click-Through Rate Prediction[J]. arXiv preprint arXiv:1809.03672, 2018. (https://arxiv.org/pdf/1809.03672.pdf)
     """
 
     def __init__(
         self,
-        dnn_feature_columns,
-        history_feature_list,
-        gru_type="GRU",
-        use_negsampling=False,
-        alpha=1.0,
-        use_bn=False,
-        dnn_hidden_units=(256, 128),
-        dnn_activation="relu",
-        att_hidden_units=(64, 16),
-        att_activation="relu",
-        att_weight_normalization=True,
-        l2_reg_dnn=0,
-        l2_reg_embedding=1e-6,
-        dnn_dropout=0,
-        init_std=0.0001,
-        seed=1024,
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        dnn_feature_columns: list[Any],
+        history_feature_list: list[str],
+        gru_type: str = "GRU",
+        use_negsampling: bool = False,
+        alpha: float = 1.0,
+        use_bn: bool = False,
+        dnn_hidden_units: tuple[int, ...] = (256, 128),
+        dnn_activation: str = "relu",
+        att_hidden_units: tuple[int, ...] = (64, 16),
+        att_activation: str = "relu",
+        att_weight_normalization: bool = True,
+        l2_reg_dnn: float = 0,
+        l2_reg_embedding: float = 1e-6,
+        dnn_dropout: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(DIEN, self).__init__(
             [],
             dnn_feature_columns,
@@ -131,7 +136,8 @@ class DIEN(BaseModel):
 
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行兴趣抽取、兴趣演化与 DNN 部分的前向计算并输出预测结果。"""
         # [B, H] , [B, T, H], [B, T, H] , [B]
         query_emb, keys_emb, neg_keys_emb, keys_length = self._get_emb(X)
         # [b, T, H],  [1]  (b<H)
@@ -153,7 +159,10 @@ class DIEN(BaseModel):
         y_pred = self.out(output)
         return y_pred
 
-    def _get_emb(self, X):
+    def _get_emb(
+        self, X: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor]:
+        """从输入中查找并拼接目标商品、历史行为及（可选）负采样序列的嵌入。"""
         # history feature columns : pos, neg
         history_feature_columns = []
         neg_history_feature_columns = []
@@ -218,7 +227,8 @@ class DIEN(BaseModel):
 
         return query_emb, keys_emb, neg_keys_emb, keys_length
 
-    def _split_columns(self):
+    def _split_columns(self) -> None:
+        """将 ``dnn_feature_columns`` 按类型拆分为稀疏、稠密与变长稀疏三类特征列。"""
         self.sparse_feature_columns = (
             list(filter(lambda x: isinstance(x, SparseFeat), self.dnn_feature_columns))
             if len(self.dnn_feature_columns)
@@ -239,14 +249,16 @@ class DIEN(BaseModel):
             else []
         )
 
-    def _compute_interest_dim(self):
+    def _compute_interest_dim(self) -> int:
+        """计算历史行为特征拼接后的嵌入维度。"""
         interest_dim = 0
         for feat in self.sparse_feature_columns:
             if feat.name in self.item_features:
                 interest_dim += feat.embedding_dim
         return interest_dim
 
-    def _compute_dnn_dim(self):
+    def _compute_dnn_dim(self) -> int:
+        """计算 DNN 输入的总维度（稀疏嵌入维度之和 + 稠密特征维度之和）。"""
         dnn_input_dim = 0
         for fc in self.sparse_feature_columns:
             dnn_input_dim += fc.embedding_dim
@@ -254,7 +266,8 @@ class DIEN(BaseModel):
             dnn_input_dim += fc.dimension
         return dnn_input_dim
 
-    def _get_deep_input_emb(self, X):
+    def _get_deep_input_emb(self, X: torch.Tensor) -> torch.Tensor:
+        """查找除历史行为序列外的稀疏特征嵌入，用于 DNN 部分的输入拼接。"""
         dnn_input_emb_list = embedding_lookup(
             X,
             self.embedding_dict,
@@ -268,7 +281,17 @@ class DIEN(BaseModel):
 
 
 class InterestExtractor(nn.Module):
-    def __init__(self, input_size, use_neg=False, init_std=0.001, device="cpu"):
+    """DIEN 的兴趣抽取层，使用 GRU 从历史行为序列中提取兴趣表示，
+    并可选地通过辅助损失（auxiliary loss）利用负采样样本监督中间隐状态。
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        use_neg: bool = False,
+        init_std: float = 0.001,
+        device: str = "cpu",
+    ) -> None:
         super(InterestExtractor, self).__init__()
         self.use_neg = use_neg
         self.gru = nn.GRU(
@@ -287,18 +310,22 @@ class InterestExtractor(nn.Module):
                 nn.init.normal_(tensor, mean=0, std=init_std)
         self.to(device)
 
-    def forward(self, keys, keys_length, neg_keys=None):
-        """
-        Parameters
-        ----------
-        keys: 3D tensor, [B, T, H]
-        keys_length: 1D tensor, [B]
-        neg_keys: 3D tensor, [B, T, H]
+    def forward(
+        self,
+        keys: torch.Tensor,
+        keys_length: torch.Tensor,
+        neg_keys: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor]:
+        """对历史行为序列执行 GRU 编码，并在启用负采样时计算辅助损失。
 
-        Returns
-        -------
-        masked_interests: 2D tensor, [b, H]
-        aux_loss: [1]
+        参数:
+            keys: 形状为 ``[B, T, H]`` 的历史行为嵌入序列。
+            keys_length: 形状为 ``[B]`` 的各样本有效序列长度。
+            neg_keys: 形状为 ``[B, T, H]`` 的负采样序列嵌入，不使用负采样时为 ``None``。
+
+        返回:
+            masked_interests: 形状为 ``[b, H]`` 的兴趣表示（``b`` 为有效长度大于 0 的样本数）。
+            aux_loss: 标量辅助损失。
         """
         batch_size, max_length, dim = keys.size()
         zero_outputs = torch.zeros(batch_size, dim, device=keys.device)
@@ -343,7 +370,14 @@ class InterestExtractor(nn.Module):
 
         return interests, aux_loss
 
-    def _cal_auxiliary_loss(self, states, click_seq, noclick_seq, keys_length):
+    def _cal_auxiliary_loss(
+        self,
+        states: torch.Tensor,
+        click_seq: torch.Tensor,
+        noclick_seq: torch.Tensor,
+        keys_length: torch.Tensor,
+    ) -> torch.Tensor:
+        """基于正/负样本序列计算辅助二分类损失，用于监督 GRU 中间隐状态。"""
         # keys_length >= 1
         mask_shape = keys_length > 0
         keys_length = keys_length[mask_shape]
@@ -402,18 +436,22 @@ class InterestExtractor(nn.Module):
 
 
 class InterestEvolving(nn.Module):
+    """DIEN 的兴趣演化层，结合注意力机制与 GRU 变体（GRU/AIGRU/AGRU/AUGRU）
+    对兴趣抽取层输出的序列做进一步演化建模。
+    """
+
     __SUPPORTED_GRU_TYPE__ = ["GRU", "AIGRU", "AGRU", "AUGRU"]
 
     def __init__(
         self,
-        input_size,
-        gru_type="GRU",
-        use_neg=False,
-        init_std=0.001,
-        att_hidden_size=(64, 16),
-        att_activation="sigmoid",
-        att_weight_normalization=False,
-    ):
+        input_size: int,
+        gru_type: str = "GRU",
+        use_neg: bool = False,
+        init_std: float = 0.001,
+        att_hidden_size: tuple[int, ...] = (64, 16),
+        att_activation: str = "sigmoid",
+        att_weight_normalization: bool = False,
+    ) -> None:
         super(InterestEvolving, self).__init__()
         if gru_type not in InterestEvolving.__SUPPORTED_GRU_TYPE__:
             raise NotImplementedError("gru_type: {gru_type} is not supported")
@@ -428,7 +466,7 @@ class InterestEvolving(nn.Module):
                 weight_normalization=att_weight_normalization,
                 return_score=False,
             )
-            self.interest_evolution = nn.GwRU(
+            self.interest_evolution = nn.GRU(
                 input_size=input_size, hidden_size=input_size, batch_first=True
             )
         elif gru_type == "AIGRU":
@@ -458,7 +496,8 @@ class InterestEvolving(nn.Module):
                 nn.init.normal_(tensor, mean=0, std=init_std)
 
     @staticmethod
-    def _get_last_state(states, keys_length):
+    def _get_last_state(states: torch.Tensor, keys_length: torch.Tensor) -> torch.Tensor:
+        """取出每个样本在其有效长度处的最后一个隐状态。"""
         # states [B, T, H]
         batch_size, max_seq_length, _ = states.size()
 
@@ -468,17 +507,23 @@ class InterestEvolving(nn.Module):
 
         return states[mask]
 
-    def forward(self, query, keys, keys_length, mask=None):
-        """
-        Parameters
-        ----------
-        query: 2D tensor, [B, H]
-        keys: (masked_interests), 3D tensor, [b, T, H]
-        keys_length: 1D tensor, [B]
+    def forward(
+        self,
+        query: torch.Tensor,
+        keys: torch.Tensor,
+        keys_length: torch.Tensor,
+        mask: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """根据所选 GRU 变体对兴趣序列做演化建模，输出融合后的兴趣表示。
 
-        Returns
-        -------
-        outputs: 2D tensor, [B, H]
+        参数:
+            query: 形状为 ``[B, H]`` 的目标商品嵌入。
+            keys: 形状为 ``[b, T, H]`` 的兴趣抽取层输出序列（``masked_interests``）。
+            keys_length: 形状为 ``[B]`` 的各样本有效序列长度。
+            mask: 预留参数，当前未使用。
+
+        返回:
+            outputs: 形状为 ``[B, H]`` 的演化后兴趣表示。
         """
         batch_size, dim = query.size()
         max_length = keys.size()[1]

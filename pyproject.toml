@@ -1,12 +1,17 @@
 [project]
 name = "funrec"
-version = "0.0.9"
+version = "0.0.10"
 description = "funrec"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [ "farlog>=1.1.7", "packaging>=24.0", "scikit-learn>=1.6.0", "torch>=2.13.0", "tqdm>=4.67.0", "requests>=2.25.0",]
+dependencies = [ "farlog>=1.1.7", "packaging>=24.0", "numpy>=1.24.0", "scikit-learn>=1.6.0", "torch>=2.13.0", "tqdm>=4.67.0", "requests>=2.25.0",]
 license = "MIT"
 license-files = ["LICENSE"]
+
+[project.optional-dependencies]
+examples = ["pandas>=2.0.0"]
+mind = ["faiss-cpu>=1.7.0", "matplotlib>=3.7.0", "pandas>=2.0.0"]
+
 [[project.authors]]
 name = "牛哥"
 email = "niuliangtao@qq.com"
@@ -30,6 +35,10 @@ Repository = "https://github.com/farfarfun/funrec"
 Releases = "https://github.com/farfarfun/funrec/releases"
 
 [tool.setuptools]
+
+[tool.ruff.lint]
+# farlog 使用 loguru 风格的 `{}` 占位符，ruff 按 stdlib logging 的 `%s` 语法误报参数过多
+ignore = ["PLE1205"]
 
 [build-system]
 requires = ["hatchling"]

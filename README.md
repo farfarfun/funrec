@@ -23,7 +23,10 @@ x = torch.zeros(2, len(features))
 print(model(x).shape)  # torch.Size([2, 1])
 ```
 
-更多训练示例见 `examples/`。
+更多训练示例见 `examples/`，运行前需额外安装 `pip install funrec[examples]`（含 `pandas`），
+各脚本按自身文件路径解析同目录下的数据文件，直接执行 `python examples/<脚本名>.py` 即可，
+无需切换工作目录。MIND 模型的训练与召回评估（`funrec.models.p2019.mind.train`）还需要
+`faiss`/`matplotlib`，安装 `pip install funrec[mind]`。
 
 
 ## 感恩的心

@@ -4,6 +4,9 @@ Reference:
     [1] Yang Y, Xu B, Shen F, et al. Operation-aware Neural Networks for User Response Prediction[J]. arXiv preprint arXiv:1904.12579, 2019. （https://arxiv.org/pdf/1904.12579）
 """
 
+from typing import Any
+
+import torch
 import torch.nn as nn
 
 from funrec.inputs import DenseFeat, SparseFeat, combined_dnn_input
@@ -12,21 +15,34 @@ from funrec.models.b2000 import BaseModel
 
 
 class Interac(nn.Module):
-    def __init__(self, first_size, second_size, emb_size, init_std, sparse=False):
+    """ONN 中用于一对特征字段的操作感知（field-aware）二阶交互嵌入模块。"""
+
+    def __init__(
+        self,
+        first_size: int,
+        second_size: int,
+        emb_size: int,
+        init_std: float,
+        sparse: bool = False,
+    ) -> None:
         super(Interac, self).__init__()
         self.emb1 = nn.Embedding(first_size, emb_size, sparse=sparse)
         self.emb2 = nn.Embedding(second_size, emb_size, sparse=sparse)
         self.__init_weight(init_std)
 
-    def __init_weight(self, init_std):
+    def __init_weight(self, init_std: float) -> None:
         nn.init.normal_(self.emb1.weight, mean=0, std=init_std)
+        nn.init.normal_(self.emb2.weight, mean=0, std=init_std)
 
-    def forward(self, first, second):
-        """
-        input:
-            x batch_size * 2
-        output:
-            y batch_size * emb_size
+    def forward(self, first: torch.Tensor, second: torch.Tensor) -> torch.Tensor:
+        """对一对特征字段的取值分别查表后做逐元素相乘，得到二阶交互表示。
+
+        参数:
+            first: 形状为 ``[batch_size, 1]`` 的第一个字段取值。
+            second: 形状为 ``[batch_size, 1]`` 的第二个字段取值。
+
+        返回:
+            形状为 ``[batch_size, emb_size]`` 的交互嵌入。
         """
         first_emb = self.emb1(first)
         second_emb = self.emb2(second)
@@ -35,43 +51,46 @@ class Interac(nn.Module):
 
 
 class ONN(BaseModel):
-    """Instantiates the Operation-aware Neural Networks  architecture.
+    """操作感知神经网络（ONN）架构。
 
-    :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of deep net
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param l2_reg_linear: float. L2 regularizer strength applied to linear part.
-    :param l2_reg_dnn: float . L2 regularizer strength applied to DNN
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param use_bn: bool,whether use bn after ffm out or not
-    :param reduce_sum: bool,whether apply reduce_sum on cross vector
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        linear_feature_columns: 线性部分使用的特征列。
+        dnn_feature_columns: 深度部分使用的特征列。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_linear: 线性部分的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_use_bn: 是否在 FFM 输出后使用 BatchNormalization。
+        dnn_activation: DNN 使用的激活函数。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Yang Y, Xu B, Shen F, et al. Operation-aware Neural Networks for User Response Prediction[J]. arXiv preprint arXiv:1904.12579, 2019. （https://arxiv.org/pdf/1904.12579）
     """
 
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        dnn_hidden_units=(128, 128),
-        l2_reg_embedding=1e-5,
-        l2_reg_linear=1e-5,
-        l2_reg_dnn=0,
-        dnn_dropout=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_use_bn=False,
-        dnn_activation="relu",
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        dnn_hidden_units: tuple[int, ...] = (128, 128),
+        l2_reg_embedding: float = 1e-5,
+        l2_reg_linear: float = 1e-5,
+        l2_reg_dnn: float = 0,
+        dnn_dropout: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_use_bn: bool = False,
+        dnn_activation: str = "relu",
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(ONN, self).__init__(
             linear_feature_columns,
             dnn_feature_columns,
@@ -198,7 +217,8 @@ class ONN(BaseModel):
                 )
         return nn.ModuleDict(temp_dict)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行线性部分、字段感知二阶交互与 DNN 部分的前向计算并融合输出。"""
         _, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )

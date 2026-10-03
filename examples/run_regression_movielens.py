@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pandas as pd
 import torch
 from sklearn.metrics import mean_squared_error
@@ -7,8 +9,11 @@ from sklearn.preprocessing import LabelEncoder
 from funrec.inputs import SparseFeat, get_feature_names
 from funrec.models import DeepFM
 
+DATA_DIR = Path(__file__).resolve().parent
+
 if __name__ == "__main__":
-    data = pd.read_csv("./movielens_sample.txt")
+    # 数据文件与本脚本同目录，按脚本自身路径解析，避免依赖运行时的工作目录
+    data = pd.read_csv(DATA_DIR / "movielens_sample.txt")
     sparse_features = ["movie_id", "user_id", "gender", "age", "occupation", "zip"]
     target = ["rating"]
 

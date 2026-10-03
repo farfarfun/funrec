@@ -4,6 +4,8 @@ Reference:
     [1] Jiaqi Ma, Zhe Zhao, Xinyang Yi, et al. Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts[C] (https://dl.acm.org/doi/10.1145/3219819.3220007)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -13,49 +15,53 @@ from funrec.models.b2000 import BaseModel
 
 
 class MMOE(BaseModel):
-    """Instantiates the Multi-gate Mixture-of-Experts architecture.
+    """多门混合专家模型（MMOE）架构。
 
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param num_experts: integer, number of experts.
-    :param expert_dnn_hidden_units: list, list of positive integer or empty list, the layer number and units in each layer of expert DNN.
-    :param gate_dnn_hidden_units: list, list of positive integer or empty list, the layer number and units in each layer of gate DNN.
-    :param tower_dnn_hidden_units: list, list of positive integer or empty list, the layer number and units in each layer of task-specific DNN.
-    :param l2_reg_linear: float, L2 regularizer strength applied to linear part.
-    :param l2_reg_embedding: float, L2 regularizer strength applied to embedding vector.
-    :param l2_reg_dnn: float, L2 regularizer strength applied to DNN.
-    :param init_std: float, to use as the initialize std of embedding vector.
-    :param seed: integer, to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_activation: Activation function to use in DNN.
-    :param dnn_use_bn: bool, Whether use BatchNormalization before activation or not in DNN.
-    :param task_types: list of str, indicating the loss of each tasks, ``"binary"`` for  binary logloss, ``"regression"`` for regression loss. e.g. ['binary', 'regression'].
-    :param task_names: list of str, indicating the predict target of each tasks.
-    :param device: str, ``"cpu"`` or ``"cuda:0"``.
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
+    参数:
+        dnn_feature_columns: 深度部分使用的特征列。
+        num_experts: 专家数量，需大于 1。
+        expert_dnn_hidden_units: 专家 DNN 各隐藏层的单元数，可为空列表。
+        gate_dnn_hidden_units: 门控 DNN 各隐藏层的单元数，可为空列表。
+        tower_dnn_hidden_units: 各任务独立塔（tower）DNN 各隐藏层的单元数，可为空列表。
+        l2_reg_linear: 线性部分的 L2 正则强度。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_activation: DNN 使用的激活函数。
+        dnn_use_bn: DNN 激活前是否使用 BatchNormalization。
+        task_types: 各任务的损失类型列表，``"binary"`` 对应二分类 logloss，
+            ``"regression"`` 对应回归损失，例如 ``["binary", "regression"]``。
+        task_names: 各任务的预测目标名称列表。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
-    :return: A PyTorch model instance.
+    参考文献:
+        [1] Jiaqi Ma, Zhe Zhao, Xinyang Yi, et al. Modeling Task Relationships in Multi-task Learning with Multi-gate Mixture-of-Experts[C] (https://dl.acm.org/doi/10.1145/3219819.3220007)
     """
 
     def __init__(
         self,
-        dnn_feature_columns,
-        num_experts=3,
-        expert_dnn_hidden_units=(256, 128),
-        gate_dnn_hidden_units=(64,),
-        tower_dnn_hidden_units=(64,),
-        l2_reg_linear=0.00001,
-        l2_reg_embedding=0.00001,
-        l2_reg_dnn=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        dnn_use_bn=False,
-        task_types=("binary", "binary"),
-        task_names=("ctr", "ctcvr"),
-        device="cpu",
-        gpus=None,
-    ):
+        dnn_feature_columns: list[Any],
+        num_experts: int = 3,
+        expert_dnn_hidden_units: tuple[int, ...] = (256, 128),
+        gate_dnn_hidden_units: tuple[int, ...] = (64,),
+        tower_dnn_hidden_units: tuple[int, ...] = (64,),
+        l2_reg_linear: float = 0.00001,
+        l2_reg_embedding: float = 0.00001,
+        l2_reg_dnn: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        dnn_use_bn: bool = False,
+        task_types: tuple[str, ...] = ("binary", "binary"),
+        task_names: tuple[str, ...] = ("ctr", "ctcvr"),
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(MMOE, self).__init__(
             linear_feature_columns=[],
             dnn_feature_columns=dnn_feature_columns,
@@ -197,7 +203,8 @@ class MMOE(BaseModel):
             )
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行专家网络、门控加权与各任务塔的前向计算，返回各任务预测结果拼接。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )
@@ -221,7 +228,7 @@ class MMOE(BaseModel):
             gate_mul_expert = torch.matmul(
                 gate_dnn_out.softmax(1).unsqueeze(1), expert_outs
             )  # (bs, 1, dim)
-            mmoe_outs.append(gate_mul_expert.squeeze())
+            mmoe_outs.append(gate_mul_expert.squeeze(1))
 
         # tower dnn (task-specific)
         task_outs = []

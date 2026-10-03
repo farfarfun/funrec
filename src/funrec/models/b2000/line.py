@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -16,7 +17,22 @@ from funrec.inputs import (
 
 
 class Linear(nn.Module):
-    def __init__(self, feature_columns, feature_index, init_std=0.0001, device="cpu"):
+    """线性部分模块，汇总稀疏特征的一阶嵌入与稠密特征的线性加权结果。
+
+    参数:
+        feature_columns: 参与线性计算的特征列。
+        feature_index: 特征名到其在拼接输入张量中起止列下标的映射。
+        init_std: 嵌入向量初始化的标准差。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+    """
+
+    def __init__(
+        self,
+        feature_columns: list[Any],
+        feature_index: dict[str, tuple[int, int]],
+        init_std: float = 0.0001,
+        device: str = "cpu",
+    ) -> None:
         super(Linear, self).__init__()
         self.feature_index = feature_index
         self.device = device
@@ -57,7 +73,12 @@ class Linear(nn.Module):
             )
             torch.nn.init.normal_(self.weight, mean=0, std=init_std)
 
-    def forward(self, X, sparse_feat_refine_weight=None):
+    def forward(
+        self,
+        X: torch.Tensor,
+        sparse_feat_refine_weight: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """计算线性部分的输出 logit，可选地对稀疏特征一阶权重做输入感知修正。"""
         sparse_embedding_list = [
             self.embedding_dict[feat.embedding_name](
                 X[

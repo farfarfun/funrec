@@ -6,24 +6,26 @@ __all__ = ["SequencePoolingLayer", "KMaxPooling"]
 
 
 class SequencePoolingLayer(nn.Module):
-    """The SequencePoolingLayer is used to apply pooling operation(sum,mean,max) on variable-length sequence feature/multi-value feature.
+    """对变长序列特征/多值特征执行池化操作（sum、mean 或 max）。
 
-    Input shape
-      - A list of two  tensor [seq_value,seq_len]
+    输入形状:
+        由两个张量组成的列表 ``[seq_value, seq_len]``：
 
-      - seq_value is a 3D tensor with shape: ``(batch_size, T, embedding_size)``
+        - ``seq_value``: 3D 张量，形状为 ``(batch_size, T, embedding_size)``。
+        - ``seq_len``: 2D 张量，形状为 ``(batch_size, 1)``，表示每个序列的有效长度。
 
-      - seq_len is a 2D tensor with shape : ``(batch_size, 1)``,indicate valid length of each sequence.
+    输出形状:
+        3D 张量，形状为 ``(batch_size, 1, embedding_size)``。
 
-    Output shape
-      - 3D tensor with shape: ``(batch_size, 1, embedding_size)``.
-
-    Arguments
-      - **mode**:str.Pooling operation to be used,can be sum,mean or max.
-
+    参数:
+        mode: 池化方式，可选 ``"sum"``/``"mean"``/``"max"``。
+        supports_masking: 若为 ``True``，输入需额外提供 mask。
+        device: 运行设备。
     """
 
-    def __init__(self, mode="mean", supports_masking=False, device="cpu"):
+    def __init__(
+        self, mode: str = "mean", supports_masking: bool = False, device: str = "cpu"
+    ) -> None:
         super(SequencePoolingLayer, self).__init__()
         if mode not in ["sum", "mean", "max"]:
             raise ValueError("parameter mode should in [sum, mean, max]")
@@ -33,8 +35,10 @@ class SequencePoolingLayer(nn.Module):
         self.eps = torch.FloatTensor([1e-8]).to(device)
         self.to(device)
 
-    def _sequence_mask(self, lengths, maxlen=None, dtype=torch.bool):
-        # Returns a mask tensor representing the first N positions of each cell.
+    def _sequence_mask(
+        self, lengths: torch.Tensor, maxlen: int | None = None, dtype: torch.dtype = torch.bool
+    ) -> torch.Tensor:
+        """返回标记每个序列前 N 个有效位置的 mask 张量。"""
         if maxlen is None:
             maxlen = lengths.max()
         row_vector = torch.arange(0, maxlen, 1).to(lengths.device)
@@ -44,7 +48,8 @@ class SequencePoolingLayer(nn.Module):
         mask.type(dtype)
         return mask
 
-    def forward(self, seq_value_len_list):
+    def forward(self, seq_value_len_list: list[torch.Tensor]) -> torch.Tensor:
+        """按配置的池化方式聚合变长序列的嵌入表示。"""
         if self.supports_masking:
             uiseq_embed_list, mask = seq_value_len_list  # [B, T, E], [B, 1]
             mask = mask.float()
@@ -81,28 +86,28 @@ class SequencePoolingLayer(nn.Module):
 
 
 class KMaxPooling(nn.Module):
-    """K Max pooling that selects the k biggest value along the specific axis.
+    """沿指定维度选取前 k 个最大值的 K-Max 池化层。
 
-    Input shape
-      -  nD tensor with shape: ``(batch_size, ..., input_dim)``.
+    输入形状:
+        nD 张量，形状为 ``(batch_size, ..., input_dim)``。
 
-    Output shape
-      - nD tensor with shape: ``(batch_size, ..., output_dim)``.
+    输出形状:
+        nD 张量，形状为 ``(batch_size, ..., output_dim)``。
 
-    Arguments
-      - **k**: positive integer, number of top elements to look for along the ``axis`` dimension.
-
-      - **axis**: positive integer, the dimension to look for elements.
-
+    参数:
+        k: 在 ``axis`` 维度上取 top-k 的 k 值。
+        axis: 执行 top-k 操作的维度。
+        device: 运行设备。
     """
 
-    def __init__(self, k: int, axis: int, device="cpu"):
+    def __init__(self, k: int, axis: int, device: str = "cpu") -> None:
         super(KMaxPooling, self).__init__()
         self.k: int = k
         self.axis: int = axis
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """沿 ``axis`` 维度返回前 ``k`` 个最大值。"""
         if self.axis < 0 or self.axis >= len(inputs.shape):
             raise ValueError(
                 f"axis must be 0~{len(inputs.shape) - 1},now is {self.axis}"

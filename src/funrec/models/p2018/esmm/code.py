@@ -4,6 +4,8 @@ Reference:
     [1] Ma X, Zhao L, Huang G, et al. Entire space multi-task model: An effective approach for estimating post-click conversion rate[C]//The 41st International ACM SIGIR Conference on Research & Development in Information Retrieval. 2018.(https://dl.acm.org/doi/10.1145/3209978.3210104)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -13,43 +15,47 @@ from funrec.models.b2000 import BaseModel
 
 
 class ESMM(BaseModel):
-    """Instantiates the Entire Space Multi-Task Model architecture.
+    """全空间多任务模型（ESMM）架构。
 
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param tower_dnn_hidden_units: list, list of positive integer or empty list, the layer number and units in each layer of task-specific DNN.
-    :param l2_reg_linear: float, L2 regularizer strength applied to linear part.
-    :param l2_reg_embedding: float, L2 regularizer strength applied to embedding vector.
-    :param l2_reg_dnn: float, L2 regularizer strength applied to DNN.
-    :param init_std: float, to use as the initialize std of embedding vector.
-    :param seed: integer, to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_activation: Activation function to use in DNN.
-    :param dnn_use_bn: bool, Whether use BatchNormalization before activation or not in DNN.
-    :param task_types: list of str, indicating the loss of each tasks, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss. e.g. ['binary', 'regression'].
-    :param task_names: list of str, indicating the predict target of each tasks.
-    :param device: str, ``"cpu"`` or ``"cuda:0"``.
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
+    参数:
+        dnn_feature_columns: 深度部分使用的特征列。
+        tower_dnn_hidden_units: 各任务独立塔（tower）DNN 各隐藏层的单元数，可为空列表。
+        l2_reg_linear: 线性部分的 L2 正则强度。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_activation: DNN 使用的激活函数。
+        dnn_use_bn: DNN 激活前是否使用 BatchNormalization。
+        task_types: 各任务的损失类型列表，ESMM 要求均为 ``"binary"``，
+            例如 ``["binary", "binary"]``。
+        task_names: 各任务的预测目标名称列表，长度必须为 2。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
-    :return: A PyTorch model instance.
+    参考文献:
+        [1] Ma X, Zhao L, Huang G, et al. Entire space multi-task model: An effective approach for estimating post-click conversion rate[C]//The 41st International ACM SIGIR Conference on Research & Development in Information Retrieval. 2018.(https://dl.acm.org/doi/10.1145/3209978.3210104)
     """
 
     def __init__(
         self,
-        dnn_feature_columns,
-        tower_dnn_hidden_units=(256, 128),
-        l2_reg_linear=0.00001,
-        l2_reg_embedding=0.00001,
-        l2_reg_dnn=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        dnn_use_bn=False,
-        task_types=("binary", "binary"),
-        task_names=("ctr", "ctcvr"),
-        device="cpu",
-        gpus=None,
-    ):
+        dnn_feature_columns: list[Any],
+        tower_dnn_hidden_units: tuple[int, ...] = (256, 128),
+        l2_reg_linear: float = 0.00001,
+        l2_reg_embedding: float = 0.00001,
+        l2_reg_dnn: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        dnn_use_bn: bool = False,
+        task_types: tuple[str, ...] = ("binary", "binary"),
+        task_names: tuple[str, ...] = ("ctr", "ctcvr"),
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(ESMM, self).__init__(
             linear_feature_columns=[],
             dnn_feature_columns=dnn_feature_columns,
@@ -117,7 +123,8 @@ class ESMM(BaseModel):
         self.add_regularization_weight(self.cvr_dnn_final_layer.weight, l2=l2_reg_dnn)
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """分别计算 CTR、CVR 塔的预测结果，并按 ``CTCVR = CTR * CVR`` 融合输出。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )

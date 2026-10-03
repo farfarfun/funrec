@@ -5,6 +5,8 @@ Reference:
     [1] Song W, Shi C, Xiao Z, et al. AutoInt: Automatic Feature Interaction Learning via Self-Attentive Neural Networks[J]. arXiv preprint arXiv:1810.11921, 2018.(https://arxiv.org/abs/1810.11921)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -14,47 +16,50 @@ from funrec.models.b2000 import BaseModel
 
 
 class AutoInt(BaseModel):
-    """Instantiates the AutoInt Network architecture.
+    """AutoInt 网络架构，基于多头自注意力自动学习特征交互。
 
-    :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param att_layer_num: int.The InteractingLayer number to be used.
-    :param att_head_num: int.The head number in multi-head  self-attention network.
-    :param att_res: bool.Whether or not use standard residual connections before output.
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of DNN
-    :param dnn_activation: Activation function to use in DNN
-    :param l2_reg_dnn: float. L2 regularizer strength applied to DNN
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param dnn_use_bn:  bool. Whether use BatchNormalization before activation or not in DNN
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        linear_feature_columns: 线性部分使用的特征列。
+        dnn_feature_columns: 深度部分使用的特征列。
+        att_layer_num: InteractingLayer 的层数。
+        att_head_num: 多头自注意力网络的头数。
+        att_res: 是否在输出前使用标准残差连接。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        dnn_activation: DNN 使用的激活函数。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        dnn_use_bn: DNN 激活前是否使用 BatchNormalization。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Song W, Shi C, Xiao Z, et al. AutoInt: Automatic Feature Interaction Learning via Self-Attentive Neural Networks[J]. arXiv preprint arXiv:1810.11921, 2018.(https://arxiv.org/abs/1810.11921)
     """
 
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        att_layer_num=3,
-        att_head_num=2,
-        att_res=True,
-        dnn_hidden_units=(256, 128),
-        dnn_activation="relu",
-        l2_reg_dnn=0,
-        l2_reg_embedding=1e-5,
-        dnn_use_bn=False,
-        dnn_dropout=0,
-        init_std=0.0001,
-        seed=1024,
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        att_layer_num: int = 3,
+        att_head_num: int = 2,
+        att_res: bool = True,
+        dnn_hidden_units: tuple[int, ...] = (256, 128),
+        dnn_activation: str = "relu",
+        l2_reg_dnn: float = 0,
+        l2_reg_embedding: float = 1e-5,
+        dnn_use_bn: bool = False,
+        dnn_dropout: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(AutoInt, self).__init__(
             linear_feature_columns,
             dnn_feature_columns,
@@ -112,7 +117,8 @@ class AutoInt(BaseModel):
 
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行线性部分、自注意力交互层与 DNN 部分的前向计算并融合输出。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )

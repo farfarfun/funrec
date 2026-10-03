@@ -12,13 +12,18 @@ __all__ = [
 
 
 class AGRUCell(nn.Module):
-    """Attention based GRU (AGRU)
+    """基于注意力的 GRU（AGRU）。
 
-    Reference:
-    -  Deep Interest Evolution Network for Click-Through Rate Prediction[J]. arXiv preprint arXiv:1809.03672, 2018.
+    参数:
+        input_size: 输入特征维度。
+        hidden_size: 隐藏状态维度。
+        bias: 是否使用偏置项。
+
+    参考文献:
+        - Deep Interest Evolution Network for Click-Through Rate Prediction[J]. arXiv preprint arXiv:1809.03672, 2018.
     """
 
-    def __init__(self, input_size, hidden_size, bias=True):
+    def __init__(self, input_size: int, hidden_size: int, bias: bool = True) -> None:
         super(AGRUCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -42,7 +47,10 @@ class AGRUCell(nn.Module):
             self.register_parameter("bias_ih", None)
             self.register_parameter("bias_hh", None)
 
-    def forward(self, inputs, hx, att_score):
+    def forward(
+        self, inputs: torch.Tensor, hx: torch.Tensor, att_score: torch.Tensor
+    ) -> torch.Tensor:
+        """用注意力得分替代更新门，计算当前时间步的隐藏状态。"""
         gi = F.linear(inputs, self.weight_ih, self.bias_ih)
         gh = F.linear(hx, self.weight_hh, self.bias_hh)
         i_r, _, i_n = gi.chunk(3, 1)
@@ -58,13 +66,18 @@ class AGRUCell(nn.Module):
 
 
 class AUGRUCell(nn.Module):
-    """Effect of GRU with attentional update gate (AUGRU)
+    """带注意力更新门的 GRU（AUGRU）。
 
-    Reference:
-    -  Deep Interest Evolution Network for Click-Through Rate Prediction[J]. arXiv preprint arXiv:1809.03672, 2018.
+    参数:
+        input_size: 输入特征维度。
+        hidden_size: 隐藏状态维度。
+        bias: 是否使用偏置项。
+
+    参考文献:
+        - Deep Interest Evolution Network for Click-Through Rate Prediction[J]. arXiv preprint arXiv:1809.03672, 2018.
     """
 
-    def __init__(self, input_size, hidden_size, bias=True):
+    def __init__(self, input_size: int, hidden_size: int, bias: bool = True) -> None:
         super(AUGRUCell, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -81,14 +94,17 @@ class AUGRUCell(nn.Module):
             self.register_parameter("bias_ih", self.bias_ih)
             # (b_hr|b_hz|b_hh)
             self.bias_hh = nn.Parameter(torch.Tensor(3 * hidden_size))
-            self.register_parameter("bias_ih", self.bias_hh)
+            self.register_parameter("bias_hh", self.bias_hh)
             for tensor in [self.bias_ih, self.bias_hh]:
                 nn.init.zeros_(tensor)
         else:
             self.register_parameter("bias_ih", None)
             self.register_parameter("bias_hh", None)
 
-    def forward(self, inputs, hx, att_score):
+    def forward(
+        self, inputs: torch.Tensor, hx: torch.Tensor, att_score: torch.Tensor
+    ) -> torch.Tensor:
+        """用注意力得分缩放更新门，计算当前时间步的隐藏状态。"""
         gi = F.linear(inputs, self.weight_ih, self.bias_ih)
         gh = F.linear(hx, self.weight_hh, self.bias_hh)
         i_r, i_z, i_n = gi.chunk(3, 1)
@@ -105,7 +121,22 @@ class AUGRUCell(nn.Module):
 
 
 class DynamicGRU(nn.Module):
-    def __init__(self, input_size: int, hidden_size: int, bias=True, gru_type="AGRU"):
+    """支持 ``PackedSequence`` 输入、按注意力得分驱动的动态 GRU。
+
+    参数:
+        input_size: 输入特征维度。
+        hidden_size: 隐藏状态维度。
+        bias: 是否使用偏置项。
+        gru_type: GRU 变体类型，``"AGRU"`` 或 ``"AUGRU"``。
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        bias: bool = True,
+        gru_type: str = "AGRU",
+    ) -> None:
         super(DynamicGRU, self).__init__()
         self.input_size: int = input_size
         self.hidden_size: int = hidden_size
@@ -115,7 +146,13 @@ class DynamicGRU(nn.Module):
         elif gru_type == "AUGRU":
             self.rnn = AUGRUCell(input_size, hidden_size, bias)
 
-    def forward(self, inputs, att_scores=None, hx=None):
+    def forward(
+        self,
+        inputs: PackedSequence,
+        att_scores: PackedSequence | None = None,
+        hx: torch.Tensor | None = None,
+    ) -> PackedSequence:
+        """按时间步展开 ``PackedSequence``，逐步调用底层 GRU Cell。"""
         if not isinstance(inputs, PackedSequence) or not isinstance(
             att_scores, PackedSequence
         ):

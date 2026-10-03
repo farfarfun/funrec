@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from pathlib import Path
+
 import pandas as pd
 import torch
 from sklearn.metrics import log_loss, roc_auc_score
@@ -8,8 +10,11 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from funrec.inputs import DenseFeat, SparseFeat, get_feature_names
 from funrec.models import DeepFM
 
+DATA_DIR = Path(__file__).resolve().parent
+
 if __name__ == "__main__":
-    data = pd.read_csv("./criteo_sample.txt")
+    # 数据文件与本脚本同目录，按脚本自身路径解析，避免依赖运行时的工作目录
+    data = pd.read_csv(DATA_DIR / "criteo_sample.txt")
 
     sparse_features = ["C" + str(i) for i in range(1, 27)]
     dense_features = ["I" + str(i) for i in range(1, 14)]

@@ -4,11 +4,14 @@ import random
 
 import numpy as np
 import torch
+from farlog import getLogger
 from sklearn.preprocessing import normalize
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from .core import MIND
+
+logger = getLogger("funrec")
 
 
 class SeqnenceDataset(Dataset):
@@ -117,7 +120,7 @@ def save_model(model, path):
 def load_model(model, path):
     state_dict = torch.load(path + "model.pth")
     model.load_state_dict(state_dict)
-    print(f"model loaded from {path}")
+    logger.info("模型已从 {} 加载", path)
     return model
 
 
@@ -272,7 +275,12 @@ def main(training_config: dict[str, object] | None = None) -> None:
         collate_fn=my_collate,
     )
 
-    model = MIND(active_config)
+    model = MIND(
+        embedding_dim=active_config["embedding_dim"],
+        max_length=active_config["max_length"],
+        n_items=active_config["n_items"],
+        interest_num=active_config.get("K", 5),
+    )
     optimizer = torch.optim.Adam(params=model.parameters(), lr=active_config["lr"])
     log_df = pd.DataFrame()
     best_reacall = -1
@@ -290,7 +298,7 @@ def main(training_config: dict[str, object] | None = None) -> None:
         pbar = tqdm(train_loader)
         model.train()
         loss_list = []
-        print("\nTraining:\n")
+        logger.info("开始训练")
         for item_seq, mask, item in pbar:
             loss = model(item_seq, mask, item)["loss"]
             loss.backward()
@@ -300,11 +308,11 @@ def main(training_config: dict[str, object] | None = None) -> None:
             pbar.set_description("Epoch [{}/{}]".format(epoch, active_config["Epoch"]))
             pbar.set_postfix(loss=np.mean(loss_list))
 
-        print("Valid")
+        logger.info("验证中")
         recall_metric = evaluate_model(
             model, valid_loader, active_config["embedding_dim"], topN=50
         )
-        print(recall_metric)
+        logger.info("验证指标：{}", recall_metric)
         recall_metric["phase"] = "valid"
         log_df = pd.concat([log_df, pd.DataFrame([recall_metric])], ignore_index=True)
         log_df.to_csv(log_csv)
@@ -316,12 +324,12 @@ def main(training_config: dict[str, object] | None = None) -> None:
         if epoch - last_improve_epoch > patience:
             break
 
-    print("Testing")
+    logger.info("测试中")
     model = load_model(model, exp_path)
     recall_metric = evaluate_model(
         model, test_loader, active_config["embedding_dim"], topN=50
     )
-    print(recall_metric)
+    logger.info("测试指标：{}", recall_metric)
     recall_metric["phase"] = "test"
     log_df = pd.concat([log_df, pd.DataFrame([recall_metric])], ignore_index=True)
     log_df.to_csv(log_csv)

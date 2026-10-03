@@ -4,6 +4,8 @@ Reference:
     [1] Zhou G, Zhu X, Song C, et al. Deep interest network for click-through rate prediction[C]//Proceedings of the 24th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining. ACM, 2018: 1059-1068. (https://arxiv.org/pdf/1706.06978.pdf)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -21,47 +23,50 @@ from funrec.models.b2000 import BaseModel
 
 
 class DIN(BaseModel):
-    """Instantiates the Deep Interest Network architecture.
+    """深度兴趣网络（DIN）架构。
 
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param history_feature_list: list,to indicate  sequence sparse field
-    :param dnn_use_bn: bool. Whether use BatchNormalization before activation or not in deep net
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of deep net
-    :param dnn_activation: Activation function to use in deep net
-    :param att_hidden_size: list,list of positive integer , the layer number and units in each layer of attention net
-    :param att_activation: Activation function to use in attention net
-    :param att_weight_normalization: bool. Whether normalize the attention score of local activation unit.
-    :param l2_reg_dnn: float. L2 regularizer strength applied to DNN
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return:  A PyTorch model instance.
+    参数:
+        dnn_feature_columns: 深度部分使用的特征列。
+        history_feature_list: 需要作为历史行为序列处理的稀疏特征名列表。
+        dnn_use_bn: DNN 激活前是否使用 BatchNormalization。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        dnn_activation: DNN 使用的激活函数。
+        att_hidden_size: 注意力网络各隐藏层的单元数。
+        att_activation: 注意力网络使用的激活函数。
+        att_weight_normalization: 是否对局部激活单元的注意力分数做归一化。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Zhou G, Zhu X, Song C, et al. Deep interest network for click-through rate prediction[C]//Proceedings of the 24th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining. ACM, 2018: 1059-1068. (https://arxiv.org/pdf/1706.06978.pdf)
     """
 
     def __init__(
         self,
-        dnn_feature_columns,
-        history_feature_list,
-        dnn_use_bn=False,
-        dnn_hidden_units=(256, 128),
-        dnn_activation="relu",
-        att_hidden_size=(64, 16),
-        att_activation="Dice",
-        att_weight_normalization=False,
-        l2_reg_dnn=0.0,
-        l2_reg_embedding=1e-6,
-        dnn_dropout=0,
-        init_std=0.0001,
-        seed=1024,
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        dnn_feature_columns: list[Any],
+        history_feature_list: list[str],
+        dnn_use_bn: bool = False,
+        dnn_hidden_units: tuple[int, ...] = (256, 128),
+        dnn_activation: str = "relu",
+        att_hidden_size: tuple[int, ...] = (64, 16),
+        att_activation: str = "Dice",
+        att_weight_normalization: bool = False,
+        l2_reg_dnn: float = 0.0,
+        l2_reg_embedding: float = 1e-6,
+        dnn_dropout: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(DIN, self).__init__(
             [],
             dnn_feature_columns,
@@ -120,7 +125,8 @@ class DIN(BaseModel):
         self.dnn_linear = nn.Linear(dnn_hidden_units[-1], 1, bias=False).to(device)
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行用户历史行为的注意力池化与 DNN 部分的前向计算。"""
         _, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )
@@ -195,7 +201,8 @@ class DIN(BaseModel):
 
         return y_pred
 
-    def _compute_interest_dim(self):
+    def _compute_interest_dim(self) -> int:
+        """计算历史行为特征拼接后的嵌入维度。"""
         interest_dim = 0
         for feat in self.sparse_feature_columns:
             if feat.name in self.history_feature_list:

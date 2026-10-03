@@ -27,20 +27,23 @@ __all__ = [
 
 
 class FM(nn.Module):
-    """Factorization Machine models pairwise (order-2) feature interactions
-    without linear term and bias.
-     Input shape
-       - 3D tensor with shape: ``(batch_size,field_size,embedding_size)``.
-     Output shape
-       - 2D tensor with shape: ``(batch_size, 1)``.
-     References
-       - [Factorization Machines](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf)
+    """因子分解机（FM），建模特征间不含线性项和偏置的二阶（成对）交互。
+
+    输入形状:
+        3D 张量，形状为 ``(batch_size, field_size, embedding_size)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, 1)``。
+
+    参考文献:
+        - [Factorization Machines](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(FM, self).__init__()
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """计算输入特征的二阶交互项。"""
         fm_input = inputs
 
         square_of_sum = torch.pow(torch.sum(fm_input, dim=1, keepdim=True), 2)
@@ -52,23 +55,23 @@ class FM(nn.Module):
 
 
 class BiInteractionPooling(nn.Module):
-    """Bi-Interaction Layer used in Neural FM,compress the
-    pairwise element-wise product of features into one single vector.
+    """NFM 中使用的双线性交互层，将特征两两逐元素相乘后压缩为单个向量。
 
-     Input shape
-       - A 3D tensor with shape:``(batch_size,field_size,embedding_size)``.
+    输入形状:
+        3D 张量，形状为 ``(batch_size, field_size, embedding_size)``。
 
-     Output shape
-       - 3D tensor with shape: ``(batch_size,1,embedding_size)``.
+    输出形状:
+        3D 张量，形状为 ``(batch_size, 1, embedding_size)``。
 
-     References
-       - [He X, Chua T S. Neural factorization machines for sparse predictive analytics[C]//Proceedings of the 40th International ACM SIGIR conference on Research and Development in Information Retrieval. ACM, 2017: 355-364.](http://arxiv.org/abs/1708.05027)
+    参考文献:
+        - [He X, Chua T S. Neural factorization machines for sparse predictive analytics[C]//Proceedings of the 40th International ACM SIGIR conference on Research and Development in Information Retrieval. ACM, 2017: 355-364.](http://arxiv.org/abs/1708.05027)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(BiInteractionPooling, self).__init__()
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """计算特征两两逐元素乘积并压缩为单个向量。"""
         concated_embeds_value = inputs
         square_of_sum = torch.pow(
             torch.sum(concated_embeds_value, dim=1, keepdim=True), 2
@@ -81,22 +84,32 @@ class BiInteractionPooling(nn.Module):
 
 
 class SENETLayer(nn.Module):
-    """SENETLayer used in FiBiNET.
-          Input shape
-            - A list of 3D tensor with shape: ``(batch_size,filed_size,embedding_size)``.
-          Output shape
-            - A list of 3D tensor with shape: ``(batch_size,filed_size,embedding_size)``.
-          Arguments
-            - **filed_size** : Positive integer, number of feature groups.
-            - **reduction_ratio** : Positive integer, dimensionality of the
-             attention network output space.
-            - **seed** : A Python integer to use as random seed.
-          References
-            - [FiBiNET: Combining Feature Importance and Bilinear feature Interaction for Click-Through Rate Prediction
+    """FiBiNET 中使用的 SENET 层。
+
+    输入形状:
+        3D 张量，形状为 ``(batch_size, filed_size, embedding_size)``。
+
+    输出形状:
+        3D 张量，形状为 ``(batch_size, filed_size, embedding_size)``。
+
+    参数:
+        filed_size: 特征分组数量。
+        reduction_ratio: 注意力网络输出空间的压缩比例。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
+        - [FiBiNET: Combining Feature Importance and Bilinear feature Interaction for Click-Through Rate Prediction
     Tongwen](https://arxiv.org/pdf/1905.09433.pdf)
     """
 
-    def __init__(self, filed_size, reduction_ratio=3, seed=1024, device="cpu"):
+    def __init__(
+        self,
+        filed_size: int,
+        reduction_ratio: int = 3,
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(SENETLayer, self).__init__()
         self.seed = seed
         self.filed_size = filed_size
@@ -109,7 +122,8 @@ class SENETLayer(nn.Module):
         )
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """计算各特征场的 SENET 注意力权重并对输入做逐元素缩放。"""
         if len(inputs.shape) != 3:
             raise ValueError(
                 "Unexpected inputs dimensions %d, expect to be 3 dimensions"
@@ -123,29 +137,34 @@ class SENETLayer(nn.Module):
 
 
 class BilinearInteraction(nn.Module):
-    """BilinearInteraction Layer used in FiBiNET.
-          Input shape
-            - A list of 3D tensor with shape: ``(batch_size,filed_size, embedding_size)``.
-          Output shape
-            - 3D tensor with shape: ``(batch_size,filed_size*(filed_size-1)/2, embedding_size)``.
-          Arguments
-            - **filed_size** : Positive integer, number of feature groups.
-            - **embedding_size** : Positive integer, embedding size of sparse features.
-            - **bilinear_type** : String, types of bilinear functions used in this layer.
-            - **seed** : A Python integer to use as random seed.
-          References
-            - [FiBiNET: Combining Feature Importance and Bilinear feature Interaction for Click-Through Rate Prediction
+    """FiBiNET 中使用的双线性交互层。
+
+    输入形状:
+        3D 张量，形状为 ``(batch_size, filed_size, embedding_size)``。
+
+    输出形状:
+        3D 张量，形状为 ``(batch_size, filed_size*(filed_size-1)/2, embedding_size)``。
+
+    参数:
+        filed_size: 特征分组数量。
+        embedding_size: 稀疏特征的嵌入维度。
+        bilinear_type: 双线性函数的类型，可选 ``"all"``/``"each"``/``"interaction"``。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
+        - [FiBiNET: Combining Feature Importance and Bilinear feature Interaction for Click-Through Rate Prediction
     Tongwen](https://arxiv.org/pdf/1905.09433.pdf)
     """
 
     def __init__(
         self,
-        filed_size,
-        embedding_size,
-        bilinear_type="interaction",
-        seed=1024,
-        device="cpu",
-    ):
+        filed_size: int,
+        embedding_size: int,
+        bilinear_type: str = "interaction",
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(BilinearInteraction, self).__init__()
         self.bilinear_type = bilinear_type
         self.seed = seed
@@ -166,7 +185,8 @@ class BilinearInteraction(nn.Module):
             raise NotImplementedError
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """对各特征场两两组合执行双线性交互。"""
         if len(inputs.shape) != 3:
             raise ValueError(
                 "Unexpected inputs dimensions %d, expect to be 3 dimensions"
@@ -194,31 +214,38 @@ class BilinearInteraction(nn.Module):
 
 
 class CIN(nn.Module):
-    """Compressed Interaction Network used in xDeepFM.
-    Input shape
-      - 3D tensor with shape: ``(batch_size,field_size,embedding_size)``.
-    Output shape
-      - 2D tensor with shape: ``(batch_size, featuremap_num)`` ``featuremap_num =  sum(self.layer_size[:-1]) // 2 + self.layer_size[-1]`` if ``split_half=True``,else  ``sum(layer_size)`` .
-    Arguments
-      - **filed_size** : Positive integer, number of feature groups.
-      - **layer_size** : list of int.Feature maps in each layer.
-      - **activation** : activation function name used on feature maps.
-      - **split_half** : bool.if set to False, half of the feature maps in each hidden will connect to output unit.
-      - **seed** : A Python integer to use as random seed.
-    References
-      - [Lian J, Zhou X, Zhang F, et al. xDeepFM: Combining Explicit and Implicit Feature Interactions for Recommender Systems[J]. arXiv preprint arXiv:1803.05170, 2018.] (https://arxiv.org/pdf/1803.05170.pdf)
+    """xDeepFM 中使用的压缩交互网络（CIN）。
+
+    输入形状:
+        3D 张量，形状为 ``(batch_size, field_size, embedding_size)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, featuremap_num)``；当 ``split_half=True`` 时
+        ``featuremap_num = sum(layer_size[:-1]) // 2 + layer_size[-1]``，否则为 ``sum(layer_size)``。
+
+    参数:
+        field_size: 特征分组数量。
+        layer_size: 各层特征图数量列表。
+        activation: 作用于特征图的激活函数名称。
+        split_half: 若为 ``False``，每个隐藏层中一半的特征图会连接到输出单元。
+        l2_reg: L2 正则强度。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
+        - [Lian J, Zhou X, Zhang F, et al. xDeepFM: Combining Explicit and Implicit Feature Interactions for Recommender Systems[J]. arXiv preprint arXiv:1803.05170, 2018.] (https://arxiv.org/pdf/1803.05170.pdf)
     """
 
     def __init__(
         self,
-        field_size,
-        layer_size=(128, 128),
-        activation="relu",
-        split_half=True,
-        l2_reg=1e-5,
-        seed=1024,
-        device="cpu",
-    ):
+        field_size: int,
+        layer_size: tuple[int, ...] | list[int] = (128, 128),
+        activation: str = "relu",
+        split_half: bool = True,
+        l2_reg: float = 1e-5,
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(CIN, self).__init__()
         if len(layer_size) == 0:
             raise ValueError(
@@ -252,7 +279,8 @@ class CIN(nn.Module):
         #             nn.init.normal_(tensor.weight, mean=0, std=init_std)
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """逐层计算压缩交互网络的特征图并拼接输出。"""
         if len(inputs.shape) != 3:
             raise ValueError(
                 "Unexpected inputs dimensions %d, expect to be 3 dimensions"
@@ -302,34 +330,36 @@ class CIN(nn.Module):
 
 
 class AFMLayer(nn.Module):
-    """Attentonal Factorization Machine models pairwise (order-2) feature
-    interactions without linear term and bias.
-      Input shape
-        - A list of 3D tensor with shape: ``(batch_size,1,embedding_size)``.
-      Output shape
-        - 2D tensor with shape: ``(batch_size, 1)``.
-      Arguments
-        - **in_features** : Positive integer, dimensionality of input features.
-        - **attention_factor** : Positive integer, dimensionality of the
-         attention network output space.
-        - **l2_reg_w** : float between 0 and 1. L2 regularizer strength
-         applied to attention network.
-        - **dropout_rate** : float between in [0,1). Fraction of the attention net output units to dropout.
-        - **seed** : A Python integer to use as random seed.
-      References
+    """注意力因子分解机（AFM），建模特征间不含线性项和偏置的二阶（成对）交互。
+
+    输入形状:
+        3D 张量列表，每个张量形状为 ``(batch_size, 1, embedding_size)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, 1)``。
+
+    参数:
+        in_features: 输入特征维度。
+        attention_factor: 注意力网络输出空间的维度。
+        l2_reg_w: 注意力网络的 L2 正则强度，取值范围 ``[0, 1)``。
+        dropout_rate: 注意力网络输出的 dropout 比例，取值范围 ``[0, 1)``。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
         - [Attentional Factorization Machines : Learning the Weight of Feature
         Interactions via Attention Networks](https://arxiv.org/pdf/1708.04617.pdf)
     """
 
     def __init__(
         self,
-        in_features,
-        attention_factor=4,
-        l2_reg_w=0,
-        dropout_rate=0,
-        seed=1024,
-        device="cpu",
-    ):
+        in_features: int,
+        attention_factor: int = 4,
+        l2_reg_w: float = 0,
+        dropout_rate: float = 0,
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(AFMLayer, self).__init__()
         self.attention_factor = attention_factor
         self.l2_reg_w = l2_reg_w
@@ -361,7 +391,8 @@ class AFMLayer(nn.Module):
 
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: list[torch.Tensor]) -> torch.Tensor:
+        """基于注意力机制计算特征两两交互的加权和。"""
         embeds_vec_list = inputs
         row = []
         col = []
@@ -392,29 +423,35 @@ class AFMLayer(nn.Module):
 
 
 class InteractingLayer(nn.Module):
-    """A Layer used in AutoInt that model the correlations between different feature fields by multi-head self-attention mechanism.
-    Input shape
-          - A 3D tensor with shape: ``(batch_size,field_size,embedding_size)``.
-    Output shape
-          - 3D tensor with shape:``(batch_size,field_size,embedding_size)``.
-    Arguments
-          - **in_features** : Positive integer, dimensionality of input features.
-          - **head_num**: int.The head number in multi-head self-attention network.
-          - **use_res**: bool.Whether or not use standard residual connections before output.
-          - **seed**: A Python integer to use as random seed.
-    References
-          - [Song W, Shi C, Xiao Z, et al. AutoInt: Automatic Feature Interaction Learning via Self-Attentive Neural Networks[J]. arXiv preprint arXiv:1810.11921, 2018.](https://arxiv.org/abs/1810.11921)
+    """AutoInt 中使用的层，通过多头自注意力机制建模不同特征场之间的相关性。
+
+    输入形状:
+        3D 张量，形状为 ``(batch_size, field_size, embedding_size)``。
+
+    输出形状:
+        3D 张量，形状为 ``(batch_size, field_size, embedding_size)``。
+
+    参数:
+        embedding_size: 输入特征维度。
+        head_num: 多头自注意力网络的头数。
+        use_res: 输出前是否使用标准残差连接。
+        scaling: 是否对注意力得分进行缩放。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
+        - [Song W, Shi C, Xiao Z, et al. AutoInt: Automatic Feature Interaction Learning via Self-Attentive Neural Networks[J]. arXiv preprint arXiv:1810.11921, 2018.](https://arxiv.org/abs/1810.11921)
     """
 
     def __init__(
         self,
-        embedding_size,
-        head_num=2,
-        use_res=True,
-        scaling=False,
-        seed=1024,
-        device="cpu",
-    ):
+        embedding_size: int,
+        head_num: int = 2,
+        use_res: bool = True,
+        scaling: bool = False,
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(InteractingLayer, self).__init__()
         if head_num <= 0:
             raise ValueError("head_num must be a int > 0")
@@ -437,7 +474,8 @@ class InteractingLayer(nn.Module):
 
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """基于多头自注意力计算特征场之间的交互表示。"""
         if len(inputs.shape) != 3:
             raise ValueError(
                 "Unexpected inputs dimensions %d, expect to be 3 dimensions"
@@ -474,32 +512,34 @@ class InteractingLayer(nn.Module):
 
 
 class CrossNet(nn.Module):
-    """The Cross Network part of Deep&Cross Network model,
-    which leans both low and high degree cross feature.
-      Input shape
-        - 2D tensor with shape: ``(batch_size, units)``.
-      Output shape
-        - 2D tensor with shape: ``(batch_size, units)``.
-      Arguments
-        - **in_features** : Positive integer, dimensionality of input features.
-        - **input_feature_num**: Positive integer, shape(Input tensor)[-1]
-        - **layer_num**: Positive integer, the cross layer number
-        - **parameterization**: string, ``"vector"``  or ``"matrix"`` ,  way to parameterize the cross network.
-        - **l2_reg**: float between 0 and 1. L2 regularizer strength applied to the kernel weights matrix
-        - **seed**: A Python integer to use as random seed.
-      References
+    """Deep&Cross Network 中的 Cross 网络部分，可同时学习低阶和高阶交叉特征。
+
+    输入形状:
+        2D 张量，形状为 ``(batch_size, units)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, units)``。
+
+    参数:
+        in_features: 输入特征维度。
+        layer_num: 交叉层的层数。
+        parameterization: 交叉网络的参数化方式，``"vector"`` 或 ``"matrix"``。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
         - [Wang R, Fu B, Fu G, et al. Deep & cross network for ad click predictions[C]//Proceedings of the ADKDD'17. ACM, 2017: 12.](https://arxiv.org/abs/1708.05123)
         - [Wang R, Shivanna R, Cheng D Z, et al. DCN-M: Improved Deep & Cross Network for Feature Cross Learning in Web-scale Learning to Rank Systems[J]. 2020.](https://arxiv.org/abs/2008.13535)
     """
 
     def __init__(
         self,
-        in_features,
-        layer_num=2,
-        parameterization="vector",
-        seed=1024,
-        device="cpu",
-    ):
+        in_features: int,
+        layer_num: int = 2,
+        parameterization: str = "vector",
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(CrossNet, self).__init__()
         self.layer_num = layer_num
         self.parameterization = parameterization
@@ -523,7 +563,8 @@ class CrossNet(nn.Module):
 
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """逐层计算显式特征交叉。"""
         x_0 = inputs.unsqueeze(2)
         x_l = x_0
         for i in range(self.layer_num):
@@ -547,26 +588,35 @@ class CrossNet(nn.Module):
 
 
 class CrossNetMix(nn.Module):
-    """The Cross Network part of DCN-Mix model, which improves DCN-M by:
-    1 add MOE to learn feature interactions in different subspaces
-    2 add nonlinear transformations in low-dimensional space
-    Input shape
-      - 2D tensor with shape: ``(batch_size, units)``.
-    Output shape
-      - 2D tensor with shape: ``(batch_size, units)``.
-    Arguments
-      - **in_features** : Positive integer, dimensionality of input features.
-      - **low_rank** : Positive integer, dimensionality of low-rank sapce.
-      - **num_experts** : Positive integer, number of experts.
-      - **layer_num**: Positive integer, the cross layer number
-      - **device**: str, e.g. ``"cpu"`` or ``"cuda:0"``
-    References
-      - [Wang R, Shivanna R, Cheng D Z, et al. DCN-M: Improved Deep & Cross Network for Feature Cross Learning in Web-scale Learning to Rank Systems[J]. 2020.](https://arxiv.org/abs/2008.13535)
+    """DCN-Mix 模型中的 Cross 网络部分，相较 DCN-M 的两点改进：
+    1. 引入 MOE 以学习不同子空间中的特征交互；
+    2. 在低维空间中加入非线性变换。
+
+    输入形状:
+        2D 张量，形状为 ``(batch_size, units)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, units)``。
+
+    参数:
+        in_features: 输入特征维度。
+        low_rank: 低秩空间的维度。
+        num_experts: 专家数量。
+        layer_num: 交叉层的层数。
+        device: 运行设备，例如 ``"cpu"`` 或 ``"cuda:0"``。
+
+    参考文献:
+        - [Wang R, Shivanna R, Cheng D Z, et al. DCN-M: Improved Deep & Cross Network for Feature Cross Learning in Web-scale Learning to Rank Systems[J]. 2020.](https://arxiv.org/abs/2008.13535)
     """
 
     def __init__(
-        self, in_features, low_rank=32, num_experts=4, layer_num=2, device="cpu"
-    ):
+        self,
+        in_features: int,
+        low_rank: int = 32,
+        num_experts: int = 4,
+        layer_num: int = 2,
+        device: str = "cpu",
+    ) -> None:
         super(CrossNetMix, self).__init__()
         self.layer_num = layer_num
         self.num_experts = num_experts
@@ -599,7 +649,8 @@ class CrossNetMix(nn.Module):
 
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """基于混合低秩专家逐层计算特征交叉。"""
         x_0 = inputs.unsqueeze(2)  # (bs, in_features, 1)
         x_l = x_0
         for i in range(self.layer_num):
@@ -648,26 +699,32 @@ class CrossNetMix(nn.Module):
 
 
 class InnerProductLayer(nn.Module):
-    """InnerProduct Layer used in PNN that compute the element-wise
-    product or inner product between feature vectors.
-      Input shape
-        - a list of 3D tensor with shape: ``(batch_size,1,embedding_size)``.
-      Output shape
-        - 3D tensor with shape: ``(batch_size, N*(N-1)/2 ,1)`` if use reduce_sum. or 3D tensor with shape:
-        ``(batch_size, N*(N-1)/2, embedding_size )`` if not use reduce_sum.
-      Arguments
-        - **reduce_sum**: bool. Whether return inner product or element-wise product
-      References
-            - [Qu Y, Cai H, Ren K, et al. Product-based neural networks for user response prediction[C]//
-            Data Mining (ICDM), 2016 IEEE 16th International Conference on. IEEE, 2016: 1149-1154.]
-            (https://arxiv.org/pdf/1611.00144.pdf)"""
+    """PNN 中使用的内积层，计算特征向量两两之间的逐元素乘积或内积。
 
-    def __init__(self, reduce_sum=True, device="cpu"):
+    输入形状:
+        3D 张量列表，每个张量形状为 ``(batch_size, 1, embedding_size)``。
+
+    输出形状:
+        若 ``reduce_sum=True``，为 3D 张量，形状 ``(batch_size, N*(N-1)/2, 1)``；
+        否则为 3D 张量，形状 ``(batch_size, N*(N-1)/2, embedding_size)``。
+
+    参数:
+        reduce_sum: 是否返回内积（``True``）而非逐元素乘积（``False``）。
+        device: 运行设备。
+
+    参考文献:
+        - [Qu Y, Cai H, Ren K, et al. Product-based neural networks for user response prediction[C]//
+        Data Mining (ICDM), 2016 IEEE 16th International Conference on. IEEE, 2016: 1149-1154.]
+        (https://arxiv.org/pdf/1611.00144.pdf)
+    """
+
+    def __init__(self, reduce_sum: bool = True, device: str = "cpu") -> None:
         super(InnerProductLayer, self).__init__()
         self.reduce_sum = reduce_sum
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: list[torch.Tensor]) -> torch.Tensor:
+        """计算特征向量两两之间的内积或逐元素乘积。"""
         embed_list = inputs
         row = []
         col = []
@@ -687,23 +744,34 @@ class InnerProductLayer(nn.Module):
 
 
 class OutterProductLayer(nn.Module):
-    """OutterProduct Layer used in PNN.This implemention is
-    adapted from code that the author of the paper published on https://github.com/Atomu2014/product-nets.
-      Input shape
-            - A list of N 3D tensor with shape: ``(batch_size,1,embedding_size)``.
-      Output shape
-            - 2D tensor with shape:``(batch_size,N*(N-1)/2 )``.
-      Arguments
-            - **filed_size** : Positive integer, number of feature groups.
-            - **kernel_type**: str. The kernel weight matrix type to use,can be mat,vec or num
-            - **seed**: A Python integer to use as random seed.
-      References
-            - [Qu Y, Cai H, Ren K, et al. Product-based neural networks for user response prediction[C]//Data Mining (ICDM), 2016 IEEE 16th International Conference on. IEEE, 2016: 1149-1154.](https://arxiv.org/pdf/1611.00144.pdf)
+    """PNN 中使用的外积层，实现改编自论文作者发布在
+    https://github.com/Atomu2014/product-nets 的代码。
+
+    输入形状:
+        N 个 3D 张量组成的列表，每个张量形状为 ``(batch_size, 1, embedding_size)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, N*(N-1)/2)``。
+
+    参数:
+        field_size: 特征分组数量。
+        embedding_size: 稀疏特征的嵌入维度。
+        kernel_type: 核权重矩阵类型，可选 ``"mat"``/``"vec"``/``"num"``。
+        seed: 随机种子。
+        device: 运行设备。
+
+    参考文献:
+        - [Qu Y, Cai H, Ren K, et al. Product-based neural networks for user response prediction[C]//Data Mining (ICDM), 2016 IEEE 16th International Conference on. IEEE, 2016: 1149-1154.](https://arxiv.org/pdf/1611.00144.pdf)
     """
 
     def __init__(
-        self, field_size, embedding_size, kernel_type="mat", seed=1024, device="cpu"
-    ):
+        self,
+        field_size: int,
+        embedding_size: int,
+        kernel_type: str = "mat",
+        seed: int = 1024,
+        device: str = "cpu",
+    ) -> None:
         super(OutterProductLayer, self).__init__()
         self.kernel_type = kernel_type
 
@@ -722,7 +790,8 @@ class OutterProductLayer(nn.Module):
 
         self.to(device)
 
-    def forward(self, inputs):
+    def forward(self, inputs: list[torch.Tensor]) -> torch.Tensor:
+        """计算特征向量两两之间的外积交互。"""
         embed_list = inputs
         row = []
         col = []
@@ -770,21 +839,31 @@ class OutterProductLayer(nn.Module):
 
 
 class ConvLayer(nn.Module):
-    """Conv Layer used in CCPM.
+    """CCPM 中使用的卷积层。
 
-    Input shape
-          - A list of N 3D tensor with shape: ``(batch_size,1,filed_size,embedding_size)``.
-    Output shape
-          - A list of N 3D tensor with shape: ``(batch_size,last_filters,pooling_size,embedding_size)``.
-    Arguments
-          - **filed_size** : Positive integer, number of feature groups.
-          - **conv_kernel_width**: list. list of positive integer or empty list,the width of filter in each conv layer.
-          - **conv_filters**: list. list of positive integer or empty list,the number of filters in each conv layer.
-    Reference:
-          - Liu Q, Yu F, Wu S, et al. A convolutional click prediction model[C]//Proceedings of the 24th ACM International on Conference on Information and Knowledge Management. ACM, 2015: 1743-1746.(http://ir.ia.ac.cn/bitstream/173211/12337/1/A%20Convolutional%20Click%20Prediction%20Model.pdf)
+    输入形状:
+        N 个 3D 张量组成的列表，每个张量形状为 ``(batch_size, 1, filed_size, embedding_size)``。
+
+    输出形状:
+        N 个 3D 张量组成的列表，每个张量形状为 ``(batch_size, last_filters, pooling_size, embedding_size)``。
+
+    参数:
+        field_size: 特征分组数量。
+        conv_kernel_width: 各卷积层滤波器宽度组成的列表，可为空列表。
+        conv_filters: 各卷积层滤波器数量组成的列表，可为空列表。
+        device: 运行设备。
+
+    参考文献:
+        - Liu Q, Yu F, Wu S, et al. A convolutional click prediction model[C]//Proceedings of the 24th ACM International on Conference on Information and Knowledge Management. ACM, 2015: 1743-1746.(http://ir.ia.ac.cn/bitstream/173211/12337/1/A%20Convolutional%20Click%20Prediction%20Model.pdf)
     """
 
-    def __init__(self, field_size, conv_kernel_width, conv_filters, device="cpu"):
+    def __init__(
+        self,
+        field_size: int,
+        conv_kernel_width: list[int],
+        conv_filters: list[int],
+        device: str = "cpu",
+    ) -> None:
         super(ConvLayer, self).__init__()
         self.device = device
         module_list = []
@@ -820,27 +899,31 @@ class ConvLayer(nn.Module):
         self.to(device)
         self.filed_shape = filed_shape
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """依次执行各卷积层，输出池化后的特征图。"""
         return self.conv_layer(inputs)
 
 
 class LogTransformLayer(nn.Module):
-    """Logarithmic Transformation Layer in Adaptive factorization network, which models arbitrary-order cross features.
+    """自适应因子分解网络（AFN）中的对数变换层，用于建模任意阶的交叉特征。
 
-    Input shape
-      - 3D tensor with shape: ``(batch_size, field_size, embedding_size)``.
-    Output shape
-      - 2D tensor with shape: ``(batch_size, ltl_hidden_size*embedding_size)``.
-    Arguments
-      - **field_size** : positive integer, number of feature groups
-      - **embedding_size** : positive integer, embedding size of sparse features
-      - **ltl_hidden_size** : integer, the number of logarithmic neurons in AFN
-    References
-      - Cheng, W., Shen, Y. and Huang, L. 2020. Adaptive Factorization Network: Learning Adaptive-Order Feature
-       Interactions. Proceedings of the AAAI Conference on Artificial Intelligence. 34, 04 (Apr. 2020), 3609-3616.
+    输入形状:
+        3D 张量，形状为 ``(batch_size, field_size, embedding_size)``。
+
+    输出形状:
+        2D 张量，形状为 ``(batch_size, ltl_hidden_size*embedding_size)``。
+
+    参数:
+        field_size: 特征分组数量。
+        embedding_size: 稀疏特征的嵌入维度。
+        ltl_hidden_size: AFN 中对数神经元的数量。
+
+    参考文献:
+        - Cheng, W., Shen, Y. and Huang, L. 2020. Adaptive Factorization Network: Learning Adaptive-Order Feature
+        Interactions. Proceedings of the AAAI Conference on Artificial Intelligence. 34, 04 (Apr. 2020), 3609-3616.
     """
 
-    def __init__(self, field_size, embedding_size, ltl_hidden_size):
+    def __init__(self, field_size: int, embedding_size: int, ltl_hidden_size: int) -> None:
         super(LogTransformLayer, self).__init__()
 
         self.ltl_weights = nn.Parameter(torch.Tensor(field_size, ltl_hidden_size))
@@ -849,7 +932,8 @@ class LogTransformLayer(nn.Module):
         nn.init.normal_(self.ltl_weights, mean=0.0, std=0.1)
         nn.init.zeros_(self.ltl_biases)
 
-    def forward(self, inputs):
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        """对输入特征执行对数-指数变换以建模任意阶交叉特征。"""
         # Avoid numeric overflow
         afn_input = torch.clamp(torch.abs(inputs), min=1e-7, max=float("Inf"))
         # Transpose to shape: ``(batch_size,embedding_size,field_size)``

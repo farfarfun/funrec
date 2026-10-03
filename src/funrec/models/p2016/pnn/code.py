@@ -5,6 +5,8 @@ Reference:
     [1] Qu Y, Cai H, Ren K, et al. Product-based neural networks for user response prediction[C]//Data Mining (ICDM), 2016 IEEE 16th International Conference on. IEEE, 2016: 1149-1154.(https://arxiv.org/pdf/1611.00144.pdf)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -14,43 +16,46 @@ from funrec.models.b2000 import BaseModel
 
 
 class PNN(BaseModel):
-    """Instantiates the Product-based Neural Network architecture.
+    """基于乘积的神经网络（PNN）。
 
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of deep net
-    :param l2_reg_embedding: float . L2 regularizer strength applied to embedding vector
-    :param l2_reg_dnn: float. L2 regularizer strength applied to DNN
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_activation: Activation function to use in DNN
-    :param use_inner: bool,whether use inner-product or not.
-    :param use_outter: bool,whether use outter-product or not.
-    :param kernel_type: str,kernel_type used in outter-product,can be ``'mat'`` , ``'vec'`` or ``'num'``
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        dnn_feature_columns: 深度网络部分使用的特征列。
+        dnn_hidden_units: DNN 各隐藏层的单元数。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_activation: DNN 使用的激活函数。
+        use_inner: 是否使用内积。
+        use_outter: 是否使用外积。
+        kernel_type: 外积使用的核类型，可选 ``"mat"``/``"vec"``/``"num"``。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Qu Y, Cai H, Ren K, et al. Product-based neural networks for user response prediction[C]//Data Mining (ICDM), 2016 IEEE 16th International Conference on. IEEE, 2016: 1149-1154.(https://arxiv.org/pdf/1611.00144.pdf)
     """
 
     def __init__(
         self,
-        dnn_feature_columns,
-        dnn_hidden_units=(128, 128),
-        l2_reg_embedding=1e-5,
-        l2_reg_dnn=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        use_inner=True,
-        use_outter=False,
-        kernel_type="mat",
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        dnn_feature_columns: list[Any],
+        dnn_hidden_units: tuple[int, ...] = (128, 128),
+        l2_reg_embedding: float = 1e-5,
+        l2_reg_dnn: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        use_inner: bool = True,
+        use_outter: bool = False,
+        kernel_type: str = "mat",
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(PNN, self).__init__(
             [],
             dnn_feature_columns,
@@ -110,7 +115,8 @@ class PNN(BaseModel):
 
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行内积/外积特征交互与 DNN 的前向计算。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )

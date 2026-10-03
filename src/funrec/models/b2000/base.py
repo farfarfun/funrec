@@ -33,6 +33,23 @@ logger = getLogger("funrec")
 
 
 class BaseModel(nn.Module):
+    """funrec 中所有 CTR/推荐模型的基类，封装了特征嵌入、线性部分、训练/评估/
+    预测循环、正则化、回调等公共逻辑，具体模型只需在子类中组合 ``embedding_dict``/
+    ``linear_model`` 与自定义的深度网络结构。
+
+    参数:
+        linear_feature_columns: 线性部分使用的特征列（``SparseFeat``/``DenseFeat``/
+            ``VarLenSparseFeat``）。
+        dnn_feature_columns: 深度网络部分使用的特征列。
+        l2_reg_linear: 线性部分权重的 L2 正则强度。
+        l2_reg_embedding: 嵌入层权重的 L2 正则强度。
+        init_std: 嵌入层权重正态初始化的标准差。
+        seed: 随机种子。
+        task: 任务类型，``"binary"``/``"multiclass"``/``"regression"``。
+        device: 运行设备，例如 ``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练时使用的 GPU 设备列表，第一个元素需与 ``device`` 一致。
+    """
+
     def __init__(
         self,
         linear_feature_columns: list[Any],
@@ -168,7 +185,7 @@ class BaseModel(nn.Module):
         optim = self.optim
 
         if self.gpus:
-            logger.info("parallel running on these gpus:", self.gpus)
+            logger.info("parallel running on these gpus: {}", self.gpus)
             model = nn.DataParallel(model, device_ids=self.gpus)
             batch_size *= len(self.gpus)  # input `batch_size` is batch_size per gpu
         else:

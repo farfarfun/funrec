@@ -6,6 +6,8 @@ Reference:
     [2] Wang R, Shivanna R, Cheng D Z, et al. DCN-M: Improved Deep & Cross Network for Feature Cross Learning in Web-scale Learning to Rank Systems[J]. 2020. (https://arxiv.org/abs/2008.13535)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -15,49 +17,54 @@ from funrec.models.b2000 import BaseModel
 
 
 class DCN(BaseModel):
-    """Instantiates the Deep&Cross Network architecture. Including DCN-V (parameterization='vector')
-    and DCN-M (parameterization='matrix').
+    """Deep & Cross Network 架构，包含 DCN-V（``parameterization="vector"``）
+    和 DCN-M（``parameterization="matrix"``）两种形式。
 
-    :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param cross_num: positive integet,cross layer number
-    :param cross_parameterization: str, ``"vector"`` or ``"matrix"``, how to parameterize the cross network.
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of DNN
-    :param l2_reg_embedding: float. L2 regularizer strength applied to embedding vector
-    :param l2_reg_cross: float. L2 regularizer strength applied to cross net
-    :param l2_reg_dnn: float. L2 regularizer strength applied to DNN
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_use_bn: bool. Whether use BatchNormalization before activation or not DNN
-    :param dnn_activation: Activation function to use in DNN
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        linear_feature_columns: 线性部分使用的特征列。
+        dnn_feature_columns: 深度部分使用的特征列。
+        cross_num: Cross 网络的层数，正整数。
+        cross_parameterization: Cross 网络的参数化方式，``"vector"`` 或 ``"matrix"``。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_cross: Cross 网络的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_use_bn: DNN 激活前是否使用 BatchNormalization。
+        dnn_activation: DNN 使用的激活函数。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Wang R, Fu B, Fu G, et al. Deep & cross network for ad click predictions[C]//Proceedings of the ADKDD'17. ACM, 2017: 12. (https://arxiv.org/abs/1708.05123)
+
+        [2] Wang R, Shivanna R, Cheng D Z, et al. DCN-M: Improved Deep & Cross Network for Feature Cross Learning in Web-scale Learning to Rank Systems[J]. 2020. (https://arxiv.org/abs/2008.13535)
     """
 
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        cross_num=2,
-        cross_parameterization="vector",
-        dnn_hidden_units=(128, 128),
-        l2_reg_linear=0.00001,
-        l2_reg_embedding=0.00001,
-        l2_reg_cross=0.00001,
-        l2_reg_dnn=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        dnn_use_bn=False,
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        cross_num: int = 2,
+        cross_parameterization: str = "vector",
+        dnn_hidden_units: tuple[int, ...] = (128, 128),
+        l2_reg_linear: float = 0.00001,
+        l2_reg_embedding: float = 0.00001,
+        l2_reg_cross: float = 0.00001,
+        l2_reg_dnn: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        dnn_use_bn: bool = False,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(DCN, self).__init__(
             linear_feature_columns=linear_feature_columns,
             dnn_feature_columns=dnn_feature_columns,
@@ -107,7 +114,8 @@ class DCN(BaseModel):
         self.add_regularization_weight(self.crossnet.kernels, l2=l2_reg_cross)
         self.to(device)
 
-    def forward(self, X):
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行线性部分、Cross 网络与 DNN 部分的前向计算并融合输出。"""
         logit = self.linear_model(X)
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict

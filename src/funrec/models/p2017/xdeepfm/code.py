@@ -4,6 +4,8 @@ Reference:
     [1] Guo H, Tang R, Ye Y, et al. Deepfm: a factorization-machine based neural network for ctr prediction[J]. arXiv preprint arXiv:1703.04247, 2017.(https://arxiv.org/abs/1703.04247)
 """
 
+from typing import Any
+
 import torch
 import torch.nn as nn
 
@@ -13,54 +15,57 @@ from funrec.models.b2000 import BaseModel
 
 
 class XDeepFM(BaseModel):
-    """构建 xDeepFM 推荐模型。
+    """xDeepFM 推荐模型。
 
-    :param linear_feature_columns: An iterable containing all the features used by linear part of the model.
-    :param dnn_feature_columns: An iterable containing all the features used by deep part of the model.
-    :param dnn_hidden_units: list,list of positive integer or empty list, the layer number and units in each layer of deep net
-    :param cin_layer_size: list,list of positive integer or empty list, the feature maps  in each hidden layer of Compressed Interaction Network
-    :param cin_split_half: bool.if set to True, half of the feature maps in each hidden will connect to output unit
-    :param cin_activation: activation function used on feature maps
-    :param l2_reg_linear: float. L2 regularizer strength applied to linear part
-    :param l2_reg_embedding: L2 regularizer strength applied to embedding vector
-    :param l2_reg_dnn: L2 regularizer strength applied to deep net
-    :param l2_reg_cin: L2 regularizer strength applied to CIN.
-    :param init_std: float,to use as the initialize std of embedding vector
-    :param seed: integer ,to use as random seed.
-    :param dnn_dropout: float in [0,1), the probability we will drop out a given DNN coordinate.
-    :param dnn_activation: Activation function to use in DNN
-    :param dnn_use_bn: bool. Whether use BatchNormalization before activation or not in DNN
-    :param task: str, ``"binary"`` for  binary logloss or  ``"regression"`` for regression loss
-    :param device: str, ``"cpu"`` or ``"cuda:0"``
-    :param gpus: list of int or torch.device for multiple gpus. If None, run on `device`. `gpus[0]` should be the same gpu with `device`.
-    :return: A PyTorch model instance.
+    参数:
+        linear_feature_columns: 线性部分使用的特征列。
+        dnn_feature_columns: 深度部分使用的特征列。
+        dnn_hidden_units: DNN 各隐藏层的单元数，可为空列表。
+        cin_layer_size: 压缩交互网络（CIN）各隐藏层的特征图数量，可为空列表。
+        cin_split_half: 为 ``True`` 时，每个隐藏层只有一半的特征图会连接到输出单元。
+        cin_activation: CIN 特征图使用的激活函数。
+        l2_reg_linear: 线性部分的 L2 正则强度。
+        l2_reg_embedding: 嵌入向量的 L2 正则强度。
+        l2_reg_dnn: DNN 的 L2 正则强度。
+        l2_reg_cin: CIN 的 L2 正则强度。
+        init_std: 嵌入向量初始化的标准差。
+        seed: 随机种子。
+        dnn_dropout: DNN 的 dropout 比例，取值范围 ``[0, 1)``。
+        dnn_activation: DNN 使用的激活函数。
+        dnn_use_bn: DNN 激活前是否使用 BatchNormalization。
+        task: 任务类型，``"binary"`` 对应二分类 logloss，``"regression"`` 对应回归损失。
+        device: 运行设备，``"cpu"`` 或 ``"cuda:0"``。
+        gpus: 多卡训练使用的 GPU 列表；为 ``None`` 时仅使用 ``device``，
+            否则 ``gpus[0]`` 需与 ``device`` 一致。
 
+    参考文献:
+        [1] Guo H, Tang R, Ye Y, et al. Deepfm: a factorization-machine based neural network for ctr prediction[J]. arXiv preprint arXiv:1703.04247, 2017.(https://arxiv.org/abs/1703.04247)
     """
 
     def __init__(
         self,
-        linear_feature_columns,
-        dnn_feature_columns,
-        dnn_hidden_units=(256, 256),
-        cin_layer_size=(
+        linear_feature_columns: list[Any],
+        dnn_feature_columns: list[Any],
+        dnn_hidden_units: tuple[int, ...] = (256, 256),
+        cin_layer_size: tuple[int, ...] = (
             256,
             128,
         ),
-        cin_split_half=True,
-        cin_activation="relu",
-        l2_reg_linear=0.00001,
-        l2_reg_embedding=0.00001,
-        l2_reg_dnn=0,
-        l2_reg_cin=0,
-        init_std=0.0001,
-        seed=1024,
-        dnn_dropout=0,
-        dnn_activation="relu",
-        dnn_use_bn=False,
-        task="binary",
-        device="cpu",
-        gpus=None,
-    ):
+        cin_split_half: bool = True,
+        cin_activation: str = "relu",
+        l2_reg_linear: float = 0.00001,
+        l2_reg_embedding: float = 0.00001,
+        l2_reg_dnn: float = 0,
+        l2_reg_cin: float = 0,
+        init_std: float = 0.0001,
+        seed: int = 1024,
+        dnn_dropout: float = 0,
+        dnn_activation: str = "relu",
+        dnn_use_bn: bool = False,
+        task: str = "binary",
+        device: str = "cpu",
+        gpus: list[int | torch.device] | None = None,
+    ) -> None:
         super(xDeepFM, self).__init__(
             linear_feature_columns,
             dnn_feature_columns,
@@ -122,6 +127,7 @@ class XDeepFM(BaseModel):
         self.to(device)
 
     def forward(self, X: torch.Tensor) -> torch.Tensor:
+        """执行线性部分、CIN 部分与 DNN 部分的前向计算并融合输出。"""
         sparse_embedding_list, dense_value_list = self.input_from_feature_columns(
             X, self.dnn_feature_columns, self.embedding_dict
         )
