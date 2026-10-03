@@ -194,3 +194,4 @@ cython_debug/
 CLAUDE.local.md
 AGENTS.local.md
 logs/
+uv.lock
