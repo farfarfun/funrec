@@ -1,6 +1,8 @@
 import math
 import os
 import random
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -15,7 +17,17 @@ logger = getLogger("funrec")
 
 
 class SeqnenceDataset(Dataset):
-    def __init__(self, config, df, phase="train"):
+    """为 MIND 训练或评估构造用户行为序列数据集。
+
+    参数:
+        config: 包含 ``max_length`` 的训练配置。
+        df: 含有 ``user_id``、``item_id`` 和 ``timestamp`` 列的行为数据。
+        phase: ``"train"`` 时随机采样训练目标，``"test"`` 时保留后 20% 物品。
+    """
+
+    def __init__(
+        self, config: Mapping[str, Any], df: Any, phase: Literal["train", "test"] = "train"
+    ) -> None:
         self.config = config
         self.df = df
         self.max_length = self.config["max_length"]
@@ -24,12 +36,12 @@ class SeqnenceDataset(Dataset):
         self.user_list = self.df["user_id"].unique()
         self.phase = phase
 
-    def __len__(
-        self,
-    ):
+    def __len__(self) -> int:
         return len(self.user2item)
 
-    def __getitem__(self, index):
+    def __getitem__(
+        self, index: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | list[Any]]:
         if self.phase == "train":
             user_id = self.user_list[index]
             item_list = self.user2item[user_id]
@@ -76,7 +88,12 @@ class SeqnenceDataset(Dataset):
                 item_list[k:],
             )
 
-    def get_test_gd(self):
+    def get_test_gd(self) -> dict[Any, list[Any]]:
+        """获取每个用户留作评估的后 20% 交互物品。
+
+        返回:
+            用户 ID 到其评估物品列表的映射。
+        """
         self.test_gd = {}
         for user in self.user2item:
             item_list = self.user2item[user]
@@ -100,7 +117,17 @@ config = {
 }
 
 
-def my_collate(batch):
+def my_collate(
+    batch: Sequence[tuple[torch.Tensor, torch.Tensor, list[Any]]],
+) -> tuple[torch.Tensor, torch.Tensor, tuple[list[Any], ...]]:
+    """将评估样本合并为张量批次，同时保留每个用户的目标物品列表。
+
+    参数:
+        batch: 数据集返回的历史物品、掩码和目标物品列表组成的样本序列。
+
+    返回:
+        历史物品张量、历史掩码张量及按用户分组的目标物品元组。
+    """
     hist_item, hist_mask, item_list = list(zip(*batch))
 
     hist_item = [x.unsqueeze(0) for x in hist_item]
@@ -111,13 +138,31 @@ def my_collate(batch):
     return hist_item, hist_mask, item_list
 
 
-def save_model(model, path):
+def save_model(model: MIND, path: str) -> None:
+    """将 MIND 模型参数保存到指定目录。
+
+    参数:
+        model: 待保存的 MIND 模型。
+        path: 模型目录，目录不存在时会自动创建。
+
+    返回:
+        无返回值。
+    """
     if not os.path.exists(path):
         os.makedirs(path)
     torch.save(model.state_dict(), path + "model.pth")
 
 
-def load_model(model, path):
+def load_model(model: MIND, path: str) -> MIND:
+    """从指定目录加载 MIND 模型参数。
+
+    参数:
+        model: 接收已保存参数的 MIND 模型实例。
+        path: 包含 ``model.pth`` 的模型目录。
+
+    返回:
+        已加载参数的模型实例。
+    """
     state_dict = torch.load(path + "model.pth")
     model.load_state_dict(state_dict)
     logger.info("模型已从 {} 加载", path)
@@ -129,7 +174,23 @@ note: 基于faiss的向量召回
 """
 
 
-def get_predict(model, test_data, hidden_size, topN=20):
+def get_predict(
+    model: MIND,
+    test_data: Iterable[tuple[torch.Tensor, torch.Tensor, Sequence[Sequence[int]]]],
+    hidden_size: int,
+    topN: int = 20,
+) -> tuple[dict[int, Sequence[int]], dict[int, Sequence[int]]]:
+    """使用 FAISS 为评估用户检索 Top-N 推荐物品。
+
+    参数:
+        model: 用于生成用户和物品嵌入的 MIND 模型。
+        test_data: 由历史物品、掩码和真实目标物品构成的评估批次。
+        hidden_size: 物品嵌入维度。
+        topN: 每位用户最多返回的推荐物品数。
+
+    返回:
+        真实目标物品映射和对应的推荐物品映射。
+    """
     import faiss
 
     item_embs = model.output_items().cpu().detach().numpy()
@@ -197,7 +258,19 @@ def get_predict(model, test_data, hidden_size, topN=20):
     return test_gd, preds
 
 
-def evaluate(preds, test_gd, topN=50):
+def evaluate(
+    preds: Mapping[int, Sequence[int]], test_gd: Mapping[int, Sequence[int]], topN: int = 50
+) -> dict[str, float]:
+    """计算召回结果的 Recall、NDCG 和 HitRate 指标。
+
+    参数:
+        preds: 用户 ID 到预测推荐物品序列的映射。
+        test_gd: 用户 ID 到真实目标物品序列的映射。
+        topN: 参与指标计算的推荐结果数。
+
+    返回:
+        包含 ``recall``、``ndcg`` 和 ``hitrate`` 的指标字典。
+    """
     total_recall = 0.0
     total_ndcg = 0.0
     total_hitrate = 0
@@ -224,12 +297,37 @@ def evaluate(preds, test_gd, topN=50):
 
 
 # 指标计算
-def evaluate_model(model, test_loader, embedding_dim, topN=20):
+def evaluate_model(
+    model: MIND,
+    test_loader: Iterable[tuple[torch.Tensor, torch.Tensor, Sequence[Sequence[int]]]],
+    embedding_dim: int,
+    topN: int = 20,
+) -> dict[str, float]:
+    """对 MIND 模型执行向量召回并计算评估指标。
+
+    参数:
+        model: 待评估的 MIND 模型。
+        test_loader: 由评估数据集生成的批次迭代器。
+        embedding_dim: 物品嵌入维度。
+        topN: 每位用户参与评估的推荐结果数。
+
+    返回:
+        包含 Recall、NDCG 和 HitRate 的指标字典。
+    """
     test_gd, preds = get_predict(model, test_loader, embedding_dim, topN=topN)
     return evaluate(preds, test_gd, topN=topN)
 
 
-def plot_embedding(data, title):
+def plot_embedding(data: np.ndarray, title: str) -> None:
+    """绘制二维物品嵌入散点图。
+
+    参数:
+        data: 形状为 ``[n_samples, 2]`` 的二维嵌入数组。
+        title: 图表标题。
+
+    返回:
+        无返回值。
+    """
     from matplotlib import pyplot as plt
 
     x_min, x_max = np.min(data, 0), np.max(data, 0)
@@ -245,7 +343,14 @@ def plot_embedding(data, title):
 
 
 def main(training_config: dict[str, object] | None = None) -> None:
-    """读取指定配置的数据，训练 MIND 模型并输出评估与嵌入图。"""
+    """读取配置的数据，训练 MIND 模型并输出评估与嵌入图。
+
+    参数:
+        training_config: 可选的训练配置；未提供时使用模块默认配置。
+
+    返回:
+        无返回值。
+    """
     import pandas as pd
     from sklearn.manifold import TSNE
 
