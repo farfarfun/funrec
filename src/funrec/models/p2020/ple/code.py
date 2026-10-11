@@ -297,9 +297,7 @@ class PLE(BaseModel):
         self.to(device)
 
     # a single cgc Layer
-    def cgc_net(
-        self, inputs: list[torch.Tensor], level_num: int
-    ) -> list[torch.Tensor]:
+    def cgc_net(self, inputs: list[torch.Tensor], level_num: int) -> list[torch.Tensor]:
         """执行单层定制门控（CGC），输出各任务专属表示与共享表示。"""
         # inputs: [task1, task2, ... taskn, shared task]
 

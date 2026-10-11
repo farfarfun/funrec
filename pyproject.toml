@@ -1,6 +1,6 @@
 [project]
 name = "funrec"
-version = "0.0.9"
+version = "1.0.10"
 description = "PyTorch recommendation models and feature engineering tools for CTR prediction"
 readme = "README.md"
 requires-python = ">=3.10"

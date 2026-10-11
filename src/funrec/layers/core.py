@@ -185,7 +185,9 @@ class PredictionLayer(nn.Module):
         use_bias: 是否额外加一个可学习的偏置项。
     """
 
-    def __init__(self, task: str = "binary", use_bias: bool = True, **kwargs: Any) -> None:
+    def __init__(
+        self, task: str = "binary", use_bias: bool = True, **kwargs: Any
+    ) -> None:
         if task not in ["binary", "multiclass", "regression"]:
             raise ValueError("task must be binary,multiclass or regression")
 

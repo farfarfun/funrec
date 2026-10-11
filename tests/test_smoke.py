@@ -253,7 +253,9 @@ def test_afm_construct_and_forward():
         SparseFeat("user_id", vocabulary_size=4, embedding_dim=4),
         SparseFeat("item_id", vocabulary_size=4, embedding_dim=4),
     ]
-    model = AFM(linear_feature_columns=feature_columns, dnn_feature_columns=feature_columns)
+    model = AFM(
+        linear_feature_columns=feature_columns, dnn_feature_columns=feature_columns
+    )
 
     feature_index = build_input_features(feature_columns)
     batch_size = 5

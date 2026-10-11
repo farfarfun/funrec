@@ -496,7 +496,9 @@ class InterestEvolving(nn.Module):
                 nn.init.normal_(tensor, mean=0, std=init_std)
 
     @staticmethod
-    def _get_last_state(states: torch.Tensor, keys_length: torch.Tensor) -> torch.Tensor:
+    def _get_last_state(
+        states: torch.Tensor, keys_length: torch.Tensor
+    ) -> torch.Tensor:
         """取出每个样本在其有效长度处的最后一个隐状态。"""
         # states [B, T, H]
         batch_size, max_seq_length, _ = states.size()

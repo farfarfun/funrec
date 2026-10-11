@@ -26,7 +26,10 @@ class SeqnenceDataset(Dataset):
     """
 
     def __init__(
-        self, config: Mapping[str, Any], df: Any, phase: Literal["train", "test"] = "train"
+        self,
+        config: Mapping[str, Any],
+        df: Any,
+        phase: Literal["train", "test"] = "train",
     ) -> None:
         self.config = config
         self.df = df
@@ -259,7 +262,9 @@ def get_predict(
 
 
 def evaluate(
-    preds: Mapping[int, Sequence[int]], test_gd: Mapping[int, Sequence[int]], topN: int = 50
+    preds: Mapping[int, Sequence[int]],
+    test_gd: Mapping[int, Sequence[int]],
+    topN: int = 50,
 ) -> dict[str, float]:
     """计算召回结果的 Recall、NDCG 和 HitRate 指标。
 

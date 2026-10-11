@@ -36,7 +36,10 @@ class SequencePoolingLayer(nn.Module):
         self.to(device)
 
     def _sequence_mask(
-        self, lengths: torch.Tensor, maxlen: int | None = None, dtype: torch.dtype = torch.bool
+        self,
+        lengths: torch.Tensor,
+        maxlen: int | None = None,
+        dtype: torch.dtype = torch.bool,
     ) -> torch.Tensor:
         """返回标记每个序列前 N 个有效位置的 mask 张量。"""
         if maxlen is None:

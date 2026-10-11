@@ -923,7 +923,9 @@ class LogTransformLayer(nn.Module):
         Interactions. Proceedings of the AAAI Conference on Artificial Intelligence. 34, 04 (Apr. 2020), 3609-3616.
     """
 
-    def __init__(self, field_size: int, embedding_size: int, ltl_hidden_size: int) -> None:
+    def __init__(
+        self, field_size: int, embedding_size: int, ltl_hidden_size: int
+    ) -> None:
         super(LogTransformLayer, self).__init__()
 
         self.ltl_weights = nn.Parameter(torch.Tensor(field_size, ltl_hidden_size))
